@@ -161,7 +161,7 @@ Define los materiales individuales (PDFs, links a páginas web, etc.).
 
 - **Rutas y URLs:** Todas las rutas almacenadas en los JSON (como `url`) deben ser **relativas a la raíz del dominio**, comenzando siempre con un `/` (ej: `/academico/quimica/`). No se deben incluir dominios absolutos como `https://berrueta.uy/`.
 - **Ubicación de PDFs:** Todos los documentos PDF subidos por el CMS deben ubicarse preferentemente en la carpeta `/academico/` (o dentro de las subcarpetas de materias si así se prefiere para organización, ej: `/academico/matematica/`). Su ruta en el JSON de datos debe coincidir exactamente.
-- **Convenciones de Nombres:** 
+- **Convenciones de Nombres:**
   - Usar minúsculas y guiones (kebab-case) para nombres de archivos y carpetas (ej. `compendio-cuadrilateros.pdf`).
   - No usar espacios ni caracteres especiales en nombres de archivos para evitar errores de codificación en las URLs.
 
