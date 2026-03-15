@@ -21,7 +21,7 @@ Cualquier cambio futuro en la estructura de carpetas o en los formatos de datos 
 
 ## 2. Árbol completo del repositorio
 
-A continuación se presenta el árbol de directorios que refleja la estructura **real y actual** del repositorio:
+A continuación se presenta el árbol de directorios que refleja la estructura **refleja la estructura actual del repositorio al momento de escribir este documento**:
 
 ```text
 /
