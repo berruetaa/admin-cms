@@ -77,8 +77,9 @@ export const Router = {
     container.innerHTML = `
       <div class="login-container">
         <div class="login-box">
-          <h2 class="logo" style="justify-content: center; margin-bottom: 2rem;">
+          <h2 class="logo" style="justify-content: center; margin-bottom: 2rem; display: flex; align-items: baseline;">
              <span class="logo-text">Berrueta</span><span class="logo-punct">;</span>
+             <span class="logo-sub">Admin</span>
           </h2>
           <form id="login-form">
             <div class="form-group">

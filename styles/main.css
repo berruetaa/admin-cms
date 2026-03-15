@@ -1,5 +1,5 @@
 /* Import Fontshare Fonts */
-@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&f[]=satoshi@400,500,700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&f[]=satoshi@300,400,500,700&display=swap');
 
 :root {
   /* Brand Colors */
@@ -96,6 +96,15 @@ h1, h2, h3, h4, h5, h6, .logo {
 
 .logo-punct {
   transition: color var(--transition-fast);
+}
+
+.logo-sub {
+  font-family: var(--font-body);
+  font-weight: 300; /* Light */
+  font-size: 1rem;
+  margin-left: 0.5rem;
+  color: var(--color-foreground);
+  opacity: 0.7;
 }
 
 .sidebar-nav {
