@@ -3,7 +3,14 @@ import { ColorfulTitle } from "./ColorfulTitle.js";
 export const Navbar = {
   render() {
     return `
-      <aside class="sidebar">
+      <div class="mobile-header">
+        <a href="#/dashboard" class="logo">
+          <span class="logo-text">Berrueta</span><span class="logo-punct">;</span>
+        </a>
+        <button id="menu-toggle" class="menu-toggle" aria-label="Toggle menu">☰</button>
+      </div>
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+      <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <a href="#/dashboard" class="logo">
             <span class="logo-text">Berrueta</span><span class="logo-punct">;</span>
@@ -38,6 +45,31 @@ export const Navbar = {
   init() {
     // Start Logo Animation
     ColorfulTitle.init();
+
+    // Mobile menu toggle
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (menuToggle && sidebar && overlay) {
+      const toggleMenu = () => {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+      };
+
+      menuToggle.addEventListener('click', toggleMenu);
+      overlay.addEventListener('click', toggleMenu);
+
+      // Close menu on navigation
+      document.querySelectorAll('.sidebar-nav a').forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+          }
+        });
+      });
+    }
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
