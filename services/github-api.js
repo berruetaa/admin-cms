@@ -1,176 +1,184 @@
-export class GitHubAPI {
-    constructor() {
-        this.token = localStorage.getItem('github_pat') || null;
-        this.baseUrl = 'https://api.github.com';
+import { Auth } from "./auth.js";
+import { Base64 } from "../utils/base64.js";
+
+const API_BASE = "https://api.github.com";
+
+/**
+ * Helper to make fetch requests to GitHub API
+ */
+async function fetchGitHub(endpoint, options = {}) {
+  const token = Auth.getToken();
+  if (!token) {
+    throw new Error("No autenticado");
+  }
+
+  const defaultHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github.v3+json",
+    "Content-Type": "application/json"
+  };
+
+  const config = {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers
     }
+  };
 
-    setToken(token) {
-        this.token = token;
-        localStorage.setItem('github_pat', token);
+  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
+  const response = await fetch(url, config);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      Auth.removeToken();
+      window.location.hash = "#/login";
     }
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `GitHub API Error: ${response.status} ${response.statusText}`);
+  }
 
-    removeToken() {
-        this.token = null;
-        localStorage.removeItem('github_pat');
-    }
-
-    isAuthenticated() {
-        return !!this.token;
-    }
-
-    getHeaders() {
-        if (!this.token) {
-            throw new Error('Not authenticated: No GitHub PAT found.');
-        }
-        return {
-            'Authorization': `Bearer ${this.token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'X-GitHub-Api-Version': '2022-11-28'
-        };
-    }
-
-    async testConnection() {
-        try {
-            const response = await fetch(`${this.baseUrl}/user`, {
-                headers: this.getHeaders()
-            });
-            if (response.ok) {
-                const data = await response.json();
-                return { success: true, user: data };
-            }
-            return { success: false, error: `HTTP ${response.status}` };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
-     * Reads a file from a specified repository.
-     * @param {Object} repoConfig {owner, repo, branch}
-     * @param {string} path
-     * @returns {Object} { content (decoded text), sha } or null if not found
-     */
-    async getFile(repoConfig, path) {
-        const { owner, repo, branch } = repoConfig;
-        const refParam = branch ? `?ref=${branch}` : '';
-        const url = `${this.baseUrl}/repos/${owner}/${repo}/contents/${path}${refParam}`;
-
-        try {
-            const response = await fetch(url, { headers: this.getHeaders() });
-
-            if (response.status === 404) {
-                return null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`GitHub API Error: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (data.type !== 'file') {
-                throw new Error('Path does not point to a file');
-            }
-
-            // Decode base64 content
-            // Need to handle UTF-8 properly: atob() is not enough for non-ASCII
-            const decodedContent = this.decodeBase64(data.content);
-
-            return {
-                content: decodedContent,
-                sha: data.sha,
-                size: data.size,
-                path: data.path
-            };
-        } catch (error) {
-            console.error('Error fetching file:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Creates or updates a file in a specified repository.
-     * @param {Object} repoConfig {owner, repo, branch}
-     * @param {string} path
-     * @param {string} content The plain text content to write
-     * @param {string} message Commit message
-     * @param {string} [sha] The SHA of the file being replaced (required for updates)
-     */
-    async commitFile(repoConfig, path, content, message, sha = null) {
-        const { owner, repo, branch } = repoConfig;
-        const url = `${this.baseUrl}/repos/${owner}/${repo}/contents/${path}`;
-
-        // Encode to base64 with UTF-8 support
-        const base64Content = this.encodeBase64(content);
-
-        const body = {
-            message: message,
-            content: base64Content,
-            branch: branch
-        };
-
-        if (sha) {
-            body.sha = sha;
-        }
-
-        try {
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    ...this.getHeaders(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`GitHub API Error: ${response.statusText} - ${errorData.message}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('Error committing file:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Gets the latest commit for a specific repository.
-     */
-    async getLatestCommit(repoConfig) {
-        const { owner, repo, branch } = repoConfig;
-        const url = `${this.baseUrl}/repos/${owner}/${repo}/commits/${branch}`;
-
-        try {
-            const response = await fetch(url, { headers: this.getHeaders() });
-            if (!response.ok) {
-                throw new Error(`Failed to fetch commit: ${response.status}`);
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('Error fetching latest commit:', error);
-            return null;
-        }
-    }
-
-    // Helpers for Base64 + UTF-8 support (Standard atob/btoa break on non-ascii)
-    decodeBase64(str) {
-        // Going backwards: from bytestream, to percent-encoding, to original string.
-        return decodeURIComponent(atob(str).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-    }
-
-    encodeBase64(str) {
-        // first we use encodeURIComponent to get percent-encoded UTF-8,
-        // then we convert the percent encodings into raw bytes which
-        // can be fed into btoa.
-        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
-            function toSolidBytes(match, p1) {
-                return String.fromCharCode('0x' + p1);
-            }));
-    }
+  return response.json();
 }
 
-export const githubApi = new GitHubAPI();
+export const GitHubAPI = {
+  /**
+   * Get a file from a repository
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string} path Path to the file
+   * @returns {Promise<Object>} The file data
+   */
+  async getFile(repoConfig, path) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    const data = await fetchGitHub(endpoint);
+
+    // Decode content if it exists
+    if (data.content && data.encoding === "base64") {
+      data.decodedContent = Base64.decode(data.content);
+    }
+
+    return data;
+  },
+
+  /**
+   * Get contents of a directory
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string} path Path to the directory
+   * @returns {Promise<Array>} Array of file/directory objects
+   */
+  async getDirectory(repoConfig, path) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    return fetchGitHub(endpoint);
+  },
+
+  /**
+   * Create a new file
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string} path Path to the file
+   * @param {string} content Raw content of the file
+   * @param {string} message Commit message
+   * @returns {Promise<Object>}
+   */
+  async createFile(repoConfig, path, content, message) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+
+    const isBase64 = content.match(/^[A-Za-z0-9+/]+={0,2}$/) && (content.length % 4 === 0);
+    const encodedContent = isBase64 ? content : Base64.encode(content);
+
+    return fetchGitHub(endpoint, {
+      method: "PUT",
+      body: JSON.stringify({
+        message,
+        content: encodedContent,
+        branch
+      })
+    });
+  },
+
+  /**
+   * Update an existing file
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string} path Path to the file
+   * @param {string} content Raw content of the file
+   * @param {string} message Commit message
+   * @param {string} sha The blob SHA of the file being replaced
+   * @returns {Promise<Object>}
+   */
+  async updateFile(repoConfig, path, content, message, sha) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+
+    const isBase64 = content.match(/^[A-Za-z0-9+/]+={0,2}$/) && (content.length % 4 === 0) && content.length > 0;
+    const encodedContent = isBase64 ? content : Base64.encode(content);
+
+    return fetchGitHub(endpoint, {
+      method: "PUT",
+      body: JSON.stringify({
+        message,
+        content: encodedContent,
+        sha,
+        branch
+      })
+    });
+  },
+
+  /**
+   * Delete a file
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string} path Path to the file
+   * @param {string} message Commit message
+   * @param {string} sha The blob SHA of the file being deleted
+   * @returns {Promise<Object>}
+   */
+  async deleteFile(repoConfig, path, message, sha) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+
+    return fetchGitHub(endpoint, {
+      method: "DELETE",
+      body: JSON.stringify({
+        message,
+        sha,
+        branch
+      })
+    });
+  },
+
+  /**
+   * Get repository info
+   * @param {Object} repoConfig { owner, repo }
+   */
+  async getRepoInfo(repoConfig) {
+    const { owner, repo } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}`;
+    return fetchGitHub(endpoint);
+  },
+
+  /**
+   * Get branches
+   */
+  async getBranches(repoConfig) {
+    const { owner, repo } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/branches`;
+    return fetchGitHub(endpoint);
+  },
+
+  /**
+   * Get latest commit
+   */
+  async getLatestCommit(repoConfig) {
+    const { owner, repo, branch } = repoConfig;
+    const endpoint = `/repos/${owner}/${repo}/commits/${branch}`;
+    return fetchGitHub(endpoint);
+  },
+
+  /**
+   * Get rate limit
+   */
+  async getRateLimit() {
+    return fetchGitHub("/rate_limit");
+  }
+};
