@@ -6,6 +6,7 @@ import { Academico } from "../modules/academico.js";
 import { Files } from "../modules/files.js";
 import { Tools } from "../modules/tools.js";
 import { System } from "../modules/system.js";
+import { ColorfulTitle } from "../components/ColorfulTitle.js";
 
 const routes = {
   "/dashboard": Dashboard,
@@ -76,17 +77,22 @@ export const Router = {
     container.innerHTML = `
       <div class="login-container">
         <div class="login-box">
-          <h2>Admin CMS</h2>
+          <h2 class="logo" style="justify-content: center; margin-bottom: 2rem;">
+             <span class="logo-text">Admin</span><span class="logo-punct">;</span>
+          </h2>
           <form id="login-form">
             <div class="form-group">
               <label for="github-token">GitHub Token</label>
               <input type="password" id="github-token" class="form-control" required placeholder="ghp_xxxxxxxxxxxxxxxxxxx">
             </div>
-            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+            <button type="submit" class="btn btn-primary w-100" style="margin-top: 1rem;">Ingresar</button>
           </form>
         </div>
       </div>
     `;
+
+    // Start animated title for login
+    ColorfulTitle.init('.logo-punct');
 
     const form = document.getElementById("login-form");
     form.addEventListener("submit", (e) => {

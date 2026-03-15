@@ -1,22 +1,26 @@
+import { ColorfulTitle } from "./ColorfulTitle.js";
+
 export const Navbar = {
   render() {
     return `
       <aside class="sidebar">
         <div class="sidebar-header">
-          <h2>Admin CMS</h2>
+          <a href="#/dashboard" class="logo">
+            <span class="logo-text">Admin</span><span class="logo-punct">;</span>
+          </a>
         </div>
         <nav class="sidebar-nav">
           <ul>
-            <li><a href="#/dashboard" id="nav-dashboard">Dashboard</a></li>
-            <li><a href="#/blog" id="nav-blog">Blog</a></li>
-            <li><a href="#/academico" id="nav-academico">Académico</a></li>
-            <li><a href="#/files" id="nav-files">Files</a></li>
-            <li><a href="#/tools" id="nav-tools">Tools</a></li>
-            <li><a href="#/system" id="nav-system">Sistema</a></li>
+            <li><a href="#/dashboard" id="nav-dashboard" class="nav-link">Dashboard</a></li>
+            <li><a href="#/blog" id="nav-blog" class="nav-link">Blog</a></li>
+            <li><a href="#/academico" id="nav-academico" class="nav-link">Académico</a></li>
+            <li><a href="#/files" id="nav-files" class="nav-link">Files</a></li>
+            <li><a href="#/tools" id="nav-tools" class="nav-link">Tools</a></li>
+            <li><a href="#/system" id="nav-system" class="nav-link">Sistema</a></li>
           </ul>
         </nav>
         <div class="sidebar-footer">
-          <button id="logout-btn" class="btn btn-danger">Cerrar Sesión</button>
+          <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesión</button>
         </div>
       </aside>
     `;
@@ -31,6 +35,9 @@ export const Navbar = {
   },
 
   init() {
+    // Start Logo Animation
+    ColorfulTitle.init();
+
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
