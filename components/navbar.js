@@ -6,7 +6,7 @@ export const Navbar = {
       <aside class="sidebar">
         <div class="sidebar-header">
           <a href="#/dashboard" class="logo">
-            <span class="logo-text">Admin</span><span class="logo-punct">;</span>
+            <span class="logo-text">Berrueta</span><span class="logo-punct">;</span>
           </a>
         </div>
         <nav class="sidebar-nav">

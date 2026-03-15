@@ -78,7 +78,7 @@ export const Router = {
       <div class="login-container">
         <div class="login-box">
           <h2 class="logo" style="justify-content: center; margin-bottom: 2rem;">
-             <span class="logo-text">Admin</span><span class="logo-punct">;</span>
+             <span class="logo-text">Berrueta</span><span class="logo-punct">;</span>
           </h2>
           <form id="login-form">
             <div class="form-group">
