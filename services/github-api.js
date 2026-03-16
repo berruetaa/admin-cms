@@ -35,7 +35,9 @@ async function fetchGitHub(endpoint, options = {}) {
       window.location.hash = "#/login";
     }
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `GitHub API Error: ${response.status} ${response.statusText}`);
+    const errorMessage = errorData.message || `GitHub API Error: ${response.status} ${response.statusText}`;
+    console.error(`GitHub API Error (${response.status}):`, errorMessage, errorData);
+    throw new Error(errorMessage);
   }
 
   return response.json();
