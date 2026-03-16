@@ -36,19 +36,20 @@ export const Academico = {
     const contentDiv = document.getElementById("academico-content");
 
     try {
-      const file = await GitHubAPI.getFile(REPOS.site, DATA_PATH);
-      this.fileSha = file.sha;
-      this.data = JSON.parse(file.decodedContent);
+      if (REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
+          contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
+          return;
+      }
 
+      const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+      const file = gist.files["data.json"];
+
+      if (!file) throw new Error("data.json no encontrado en el Gist");
+
+      this.data = JSON.parse(file.content);
       this.renderContent(contentDiv);
     } catch (error) {
-      if (error.message.includes("404")) {
-        // File doesn't exist yet, we'll initialize it
-        this.data = { categories: [], resources: [] };
-        this.renderContent(contentDiv);
-      } else {
-        contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-      }
+      contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
     }
   },
 
@@ -76,20 +77,20 @@ export const Academico = {
     html += `</tbody></table>
       <h3 style="margin-top: 2rem;">Recursos</h3>
       <table class="table">
-        <thead><tr><th>ID</th><th>Título</th><th>Categoría</th><th>Tipo</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Título</th><th>Categoría</th><th>Grupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
         <tbody>
     `;
 
-    this.data.resources.forEach(res => {
+    this.data.resources.forEach((res, index) => {
       html += `
         <tr>
-          <td>${res.id}</td>
           <td>${res.title}</td>
-          <td>${res.category_id}</td>
+          <td>${res.category}</td>
+          <td>${res.group || '-'}</td>
           <td>${res.type}</td>
           <td class="actions">
-            <button class="btn btn-sm btn-secondary btn-edit-res" data-id="${res.id}">Editar</button>
-            <button class="btn btn-sm btn-danger btn-delete-res" data-id="${res.id}">Borrar</button>
+            <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${index}">Editar</button>
+            <button class="btn btn-sm btn-danger btn-delete-res" data-index="${index}">Borrar</button>
           </td>
         </tr>
       `;
@@ -102,22 +103,19 @@ export const Academico = {
     container.querySelectorAll('.btn-edit-cat').forEach(btn => btn.addEventListener('click', (e) => this.showCategoryModal(e.target.dataset.id)));
     container.querySelectorAll('.btn-delete-cat').forEach(btn => btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id)));
 
-    container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.id)));
-    container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.id)));
+    container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.index)));
+    container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
   },
 
-  async saveData(message) {
-    const loadingModal = Modal.showLoading("Guardando cambios...");
+  async saveData() {
+    const loadingModal = Modal.showLoading("Guardando cambios en Gist...");
     const content = JSON.stringify(this.data, null, 2);
 
     try {
-      if (this.fileSha) {
-        const response = await GitHubAPI.updateFile(REPOS.site, DATA_PATH, content, message, this.fileSha);
-        this.fileSha = response.content.sha;
-      } else {
-        const response = await GitHubAPI.createFile(REPOS.site, DATA_PATH, content, message);
-        this.fileSha = response.content.sha;
-      }
+      await GitHubAPI.updateGist(REPOS.gists.academico, {
+        "data.json": { content }
+      });
+
       Modal.close(loadingModal);
       this.renderContent(document.getElementById("academico-content"));
     } catch (error) {
@@ -159,20 +157,20 @@ export const Academico = {
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update category ${id}` : `Create category ${formData.id}`);
+      this.saveData();
     });
   },
 
   deleteCategory(id) {
     Modal.showConfirm(`¿Eliminar la categoría ${id}?`, () => {
       this.data.categories = this.data.categories.filter(c => c.id !== id);
-      this.saveData(`Delete category ${id}`);
+      this.saveData();
     });
   },
 
-  showResourceModal(id = null) {
-    const isEdit = !!id;
-    const res = isEdit ? this.data.resources.find(r => r.id === id) : null;
+  showResourceModal(index = null) {
+    const isEdit = index !== null;
+    const res = isEdit ? this.data.resources[index] : null;
 
     const catOptions = this.data.categories.map(c => ({ value: c.id, label: c.name }));
     const typeOptions = [
@@ -184,9 +182,10 @@ export const Academico = {
       isEdit ? "Editar Recurso" : "Nuevo Recurso",
       `
         <form id="res-form">
-          ${Form.renderField({ id: "id", label: "ID (slug)", value: isEdit ? res.id : '', required: true, type: "text" })}
           ${Form.renderField({ id: "title", label: "Título", value: isEdit ? res.title : '', required: true, type: "text" })}
-          ${Form.renderField({ id: "category_id", label: "Categoría", value: isEdit ? res.category_id : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
+          ${Form.renderField({ id: "category", label: "Categoría", value: isEdit ? res.category : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
+          ${Form.renderField({ id: "group", label: "Grupo", value: isEdit ? res.group : '', required: true, type: "text" })}
+          ${Form.renderField({ id: "tags", label: "Tags (separados por coma)", value: isEdit ? (res.tags || []).join(', ') : '', type: "text" })}
           ${Form.renderField({ id: "type", label: "Tipo", value: isEdit ? res.type : 'pdf', required: true, type: "select", options: typeOptions })}
           ${Form.renderField({ id: "url", label: "URL o Ruta del Archivo", value: isEdit ? res.url : '', required: true, type: "text" })}
           ${Form.renderField({ id: "description", label: "Descripción", value: isEdit ? res.description : '', type: "textarea", rows: 3 })}
@@ -204,27 +203,34 @@ export const Academico = {
       if (!form.checkValidity()) { form.reportValidity(); return; }
 
       const formData = Form.getFormData(form, [
-        {id: "id", type: "text"}, {id: "title", type: "text"},
-        {id: "category_id", type: "text"}, {id: "type", type: "text"},
-        {id: "url", type: "text"}, {id: "description", type: "text"}
+        {id: "title", type: "text"},
+        {id: "category", type: "text"},
+        {id: "group", type: "text"},
+        {id: "tags", type: "text"},
+        {id: "type", type: "text"},
+        {id: "url", type: "text"},
+        {id: "description", type: "text"}
       ]);
 
+      // Process tags from string to array
+      formData.tags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t !== "") : [];
+
       if (isEdit) {
-        const index = this.data.resources.findIndex(r => r.id === id);
         this.data.resources[index] = formData;
       } else {
         this.data.resources.push(formData);
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update resource ${id}` : `Create resource ${formData.id}`);
+      this.saveData();
     });
   },
 
-  deleteResource(id) {
-    Modal.showConfirm(`¿Eliminar el recurso ${id}?`, () => {
-      this.data.resources = this.data.resources.filter(r => r.id !== id);
-      this.saveData(`Delete resource ${id}`);
+  deleteResource(index) {
+    const res = this.data.resources[index];
+    Modal.showConfirm(`¿Eliminar el recurso ${res.title}?`, () => {
+      this.data.resources.splice(index, 1);
+      this.saveData();
     });
   },
 
