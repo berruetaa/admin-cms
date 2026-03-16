@@ -10,6 +10,6 @@ export const REPOS = {
     branch: "main"
   },
   gists: {
-    get academico() { return window.GIST_ID_MOCK || "YOUR_GIST_ID_HERE"; }
+    get academico() { return window.GIST_ID_MOCK || "2d9ae5eaedff0bef55ffdb3e82374edd"; }
   }
 };
