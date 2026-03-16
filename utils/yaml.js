@@ -81,7 +81,12 @@ export const YAML = {
       } else if (typeof value === 'object' && value !== null) {
         // Nested objects not fully supported, skip or handle basically
       } else {
-        yaml += `${key}: ${this._formatValue(value)}\n`;
+        // Always quote dates and descriptions for consistency with user example
+        if (key.toLowerCase().includes('datetime') || key === 'description' || key === 'title') {
+           yaml += `${key}: "${String(value).replace(/"/g, '\\"')}"\n`;
+        } else {
+           yaml += `${key}: ${this._formatValue(value)}\n`;
+        }
       }
     }
 
@@ -91,7 +96,10 @@ export const YAML = {
   _formatValue(value) {
     if (typeof value === "string") {
       // Check if string contains spaces or special chars, add quotes if needed
-      if (value.includes(":") || value.includes("\n") || value === "") {
+      // Added check for more characters that usually require quotes in YAML
+      const needsQuotes = /[:#\[\]{}|>&%@`!,]/.test(value) || value === "" || /^\s/.test(value) || /\s$/.test(value);
+
+      if (needsQuotes) {
         return `"${value.replace(/"/g, '\\"')}"`;
       }
       return value;

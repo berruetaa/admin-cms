@@ -82,9 +82,10 @@ export const Blog = {
       isEdit ? "Editar Artículo" : "Nuevo Artículo",
       `
         <form id="post-form">
-          ${Form.renderField({ id: "slug", label: "Slug (nombre archivo)", value: isEdit ? post.name.replace('.md', '') : '', required: true, type: "text" })}
+          ${Form.renderField({ id: "slug", label: "Slug", value: isEdit ? (post.frontmatter.slug || post.name.replace('.md', '')) : '', required: true, type: "text" })}
           ${Form.renderField({ id: "title", label: "Título", value: isEdit ? post.frontmatter.title : '', required: true })}
           ${Form.renderField({ id: "pubDatetime", label: "Fecha de publicación", value: isEdit ? post.frontmatter.pubDatetime : new Date().toISOString(), type: "text", required: true })}
+          ${Form.renderField({ id: "modDatetime", label: "Fecha de modificación", value: isEdit ? post.frontmatter.modDatetime : new Date().toISOString(), type: "text", required: true })}
           ${Form.renderField({ id: "author", label: "Autor", value: isEdit ? post.frontmatter.author : 'Sebastián Berrueta', required: true })}
           ${Form.renderField({ id: "description", label: "Descripción", value: isEdit ? post.frontmatter.description : '', type: "textarea", rows: 2, required: true })}
           ${Form.renderField({ id: "tags", label: "Tags", value: isEdit ? (post.frontmatter.tags || []) : [], type: "tags" })}
@@ -149,6 +150,7 @@ export const Blog = {
         { id: "slug", type: "text" },
         { id: "title", type: "text" },
         { id: "pubDatetime", type: "text" },
+        { id: "modDatetime", type: "text" },
         { id: "author", type: "text" },
         { id: "description", type: "textarea" },
         { id: "tags", type: "tags" },
@@ -160,13 +162,15 @@ export const Blog = {
       const filePath = `${BLOG_PATH}/${slug}.md`;
 
       const frontmatter = {
-        title: data.title,
-        pubDatetime: data.pubDatetime,
         author: data.author,
-        description: data.description,
-        tags: data.tags,
+        pubDatetime: data.pubDatetime,
+        modDatetime: data.modDatetime,
+        title: data.title,
+        slug: slug,
         featured: data.featured,
-        draft: data.draft
+        draft: data.draft,
+        tags: data.tags,
+        description: data.description
       };
 
       const fullContent = Markdown.stringifyFrontmatter(frontmatter, markdownContent);

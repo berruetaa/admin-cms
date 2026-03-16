@@ -1,0 +1,12 @@
+{
+  "name": "admin-cms-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for Admin CMS",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.1"
+  }
+}

@@ -76,20 +76,20 @@ export const Academico = {
     html += `</tbody></table>
       <h3 style="margin-top: 2rem;">Recursos</h3>
       <table class="table">
-        <thead><tr><th>ID</th><th>Título</th><th>Categoría</th><th>Tipo</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Título</th><th>Categoría</th><th>Grupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
         <tbody>
     `;
 
-    this.data.resources.forEach(res => {
+    this.data.resources.forEach((res, index) => {
       html += `
         <tr>
-          <td>${res.id}</td>
           <td>${res.title}</td>
-          <td>${res.category_id}</td>
+          <td>${res.category}</td>
+          <td>${res.group || '-'}</td>
           <td>${res.type}</td>
           <td class="actions">
-            <button class="btn btn-sm btn-secondary btn-edit-res" data-id="${res.id}">Editar</button>
-            <button class="btn btn-sm btn-danger btn-delete-res" data-id="${res.id}">Borrar</button>
+            <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${index}">Editar</button>
+            <button class="btn btn-sm btn-danger btn-delete-res" data-index="${index}">Borrar</button>
           </td>
         </tr>
       `;
@@ -102,8 +102,8 @@ export const Academico = {
     container.querySelectorAll('.btn-edit-cat').forEach(btn => btn.addEventListener('click', (e) => this.showCategoryModal(e.target.dataset.id)));
     container.querySelectorAll('.btn-delete-cat').forEach(btn => btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id)));
 
-    container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.id)));
-    container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.id)));
+    container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.index)));
+    container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
   },
 
   async saveData(message) {
@@ -170,9 +170,9 @@ export const Academico = {
     });
   },
 
-  showResourceModal(id = null) {
-    const isEdit = !!id;
-    const res = isEdit ? this.data.resources.find(r => r.id === id) : null;
+  showResourceModal(index = null) {
+    const isEdit = index !== null;
+    const res = isEdit ? this.data.resources[index] : null;
 
     const catOptions = this.data.categories.map(c => ({ value: c.id, label: c.name }));
     const typeOptions = [
@@ -184,9 +184,10 @@ export const Academico = {
       isEdit ? "Editar Recurso" : "Nuevo Recurso",
       `
         <form id="res-form">
-          ${Form.renderField({ id: "id", label: "ID (slug)", value: isEdit ? res.id : '', required: true, type: "text" })}
           ${Form.renderField({ id: "title", label: "Título", value: isEdit ? res.title : '', required: true, type: "text" })}
-          ${Form.renderField({ id: "category_id", label: "Categoría", value: isEdit ? res.category_id : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
+          ${Form.renderField({ id: "category", label: "Categoría", value: isEdit ? res.category : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
+          ${Form.renderField({ id: "group", label: "Grupo", value: isEdit ? res.group : '', required: true, type: "text" })}
+          ${Form.renderField({ id: "tags", label: "Tags (separados por coma)", value: isEdit ? (res.tags || []).join(', ') : '', type: "text" })}
           ${Form.renderField({ id: "type", label: "Tipo", value: isEdit ? res.type : 'pdf', required: true, type: "select", options: typeOptions })}
           ${Form.renderField({ id: "url", label: "URL o Ruta del Archivo", value: isEdit ? res.url : '', required: true, type: "text" })}
           ${Form.renderField({ id: "description", label: "Descripción", value: isEdit ? res.description : '', type: "textarea", rows: 3 })}
@@ -204,27 +205,34 @@ export const Academico = {
       if (!form.checkValidity()) { form.reportValidity(); return; }
 
       const formData = Form.getFormData(form, [
-        {id: "id", type: "text"}, {id: "title", type: "text"},
-        {id: "category_id", type: "text"}, {id: "type", type: "text"},
-        {id: "url", type: "text"}, {id: "description", type: "text"}
+        {id: "title", type: "text"},
+        {id: "category", type: "text"},
+        {id: "group", type: "text"},
+        {id: "tags", type: "text"},
+        {id: "type", type: "text"},
+        {id: "url", type: "text"},
+        {id: "description", type: "text"}
       ]);
 
+      // Process tags from string to array
+      formData.tags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t !== "") : [];
+
       if (isEdit) {
-        const index = this.data.resources.findIndex(r => r.id === id);
         this.data.resources[index] = formData;
       } else {
         this.data.resources.push(formData);
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update resource ${id}` : `Create resource ${formData.id}`);
+      this.saveData(isEdit ? `Update resource: ${formData.title}` : `Create resource: ${formData.title}`);
     });
   },
 
-  deleteResource(id) {
-    Modal.showConfirm(`¿Eliminar el recurso ${id}?`, () => {
-      this.data.resources = this.data.resources.filter(r => r.id !== id);
-      this.saveData(`Delete resource ${id}`);
+  deleteResource(index) {
+    const res = this.data.resources[index];
+    Modal.showConfirm(`¿Eliminar el recurso ${res.title}?`, () => {
+      this.data.resources.splice(index, 1);
+      this.saveData(`Delete resource: ${res.title}`);
     });
   },
 
