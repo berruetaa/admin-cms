@@ -36,7 +36,25 @@ async function fetchGitHub(endpoint, options = {}) {
     }
     const errorData = await response.json().catch(() => ({}));
     const errorMessage = errorData.message || `GitHub API Error: ${response.status} ${response.statusText}`;
-    console.error(`GitHub API Error (${response.status}):`, errorMessage, errorData);
+    // Get headers case-insensitively
+    let scopes = null;
+    for (const [key, value] of response.headers.entries()) {
+        if (key.toLowerCase() === 'x-oauth-scopes') {
+            scopes = value;
+            break;
+        }
+    }
+
+    console.error(`GitHub API Error (${response.status}):`, errorMessage, {
+      errorData,
+      scopes,
+      url: response.url
+    });
+
+    if (response.status === 404 && (scopes === "" || (scopes && !scopes.includes("gist")))) {
+      throw new Error("El token no tiene permisos para Gists. Por favor cree un nuevo token con el scope 'gist'.");
+    }
+
     throw new Error(errorMessage);
   }
 
@@ -197,5 +215,12 @@ export const GitHubAPI = {
       method: "PATCH",
       body: JSON.stringify({ files })
     });
+  },
+
+  /**
+   * Raw fetch to GitHub API (exported for custom checks)
+   */
+  async fetchGitHub(endpoint, options = {}) {
+    return fetchGitHub(endpoint, options);
   }
 };

@@ -42,6 +42,15 @@ export const Academico = {
       }
 
       const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+
+      // Verificar si el usuario actual es el dueño del Gist (opcional pero ayuda al debug)
+      try {
+        const user = await GitHubAPI.fetchGitHub("/user");
+        if (gist.owner && gist.owner.login !== user.login) {
+          console.warn(`Aviso: No eres el dueño de este Gist (${gist.owner.login}). Solo podrás guardar cambios si es público y tienes permisos.`);
+        }
+      } catch (e) { /* ignore */ }
+
       const file = gist.files["data.json"];
 
       if (!file) throw new Error("Archivo 'data.json' no encontrado en el Gist configurado.");
