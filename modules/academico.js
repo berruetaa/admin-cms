@@ -36,20 +36,41 @@ export const Academico = {
     const contentDiv = document.getElementById("academico-content");
 
     try {
-      if (REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
+      if (!REPOS.gists.academico || REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
           contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
           return;
       }
 
       const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+
+      // Verificar si el usuario actual es el dueño del Gist (opcional pero ayuda al debug)
+      try {
+        const user = await GitHubAPI.fetchGitHub("/user");
+        if (gist.owner && gist.owner.login !== user.login) {
+          console.warn(`Aviso: No eres el dueño de este Gist (${gist.owner.login}). Solo podrás guardar cambios si es público y tienes permisos.`);
+        }
+      } catch (e) { /* ignore */ }
+
       const file = gist.files["data.json"];
 
-      if (!file) throw new Error("data.json no encontrado en el Gist");
+      if (!file) throw new Error("Archivo 'data.json' no encontrado en el Gist configurado.");
 
-      this.data = JSON.parse(file.content);
+      const parsedData = JSON.parse(file.content);
+
+      // Asegurar que existan los arrays necesarios
+      this.data = {
+        categories: parsedData.categories || [],
+        resources: parsedData.resources || []
+      };
+
       this.renderContent(contentDiv);
     } catch (error) {
-      contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+      console.error("Error loading Academico data:", error);
+      contentDiv.innerHTML = `<div class="alert alert-danger">
+        <h4>Error al cargar datos</h4>
+        <p>${error.message}</p>
+        <button class="btn btn-sm btn-secondary" onclick="location.reload()">Reintentar</button>
+      </div>`;
     }
   },
 
@@ -119,6 +140,7 @@ export const Academico = {
       Modal.close(loadingModal);
       this.renderContent(document.getElementById("academico-content"));
     } catch (error) {
+      console.error("Error saving Academico data to Gist:", error);
       Modal.close(loadingModal);
       Modal.showError(`Error al guardar: ${error.message}`);
     }
@@ -134,6 +156,8 @@ export const Academico = {
         <form id="cat-form">
           ${Form.renderField({ id: "id", label: "ID (slug)", value: isEdit ? cat.id : '', required: true, type: "text" })}
           ${Form.renderField({ id: "name", label: "Nombre", value: isEdit ? cat.name : '', required: true, type: "text" })}
+          ${Form.renderField({ id: "description", label: "Descripción", value: isEdit ? (cat.description || '') : '', type: "text" })}
+          ${Form.renderField({ id: "url", label: "URL Relativa (ej: /academico/fisica/)", value: isEdit ? (cat.url || '') : '', type: "text" })}
         </form>
       `,
       `
@@ -147,12 +171,30 @@ export const Academico = {
       const form = overlay.querySelector("#cat-form");
       if (!form.checkValidity()) { form.reportValidity(); return; }
 
-      const formData = Form.getFormData(form, [{id: "id", type: "text"}, {id: "name", type: "text"}]);
+      const formData = Form.getFormData(form, [
+        {id: "id", type: "text"},
+        {id: "name", type: "text"},
+        {id: "description", type: "text"},
+        {id: "url", type: "text"}
+      ]);
 
       if (isEdit) {
         const index = this.data.categories.findIndex(c => c.id === id);
+
+        // Si el ID cambió, actualizar referencias en recursos
+        if (formData.id !== id) {
+          this.data.resources.forEach(res => {
+            if (res.category === id) res.category = formData.id;
+          });
+        }
+
         this.data.categories[index] = formData;
       } else {
+        // Verificar que el ID no exista
+        if (this.data.categories.some(c => c.id === formData.id)) {
+          alert("Ya existe una categoría con ese ID.");
+          return;
+        }
         this.data.categories.push(formData);
       }
 
@@ -277,6 +319,7 @@ export const Academico = {
         Modal.close(loadingModal);
         Modal.showError("Archivo subido correctamente. Ahora puede crear un recurso para él."); // using showError as alert for simplicity
       } catch (error) {
+        console.error("Error uploading PDF:", error);
         Modal.close(loadingModal);
         Modal.showError(`Error al subir: ${error.message}`);
       }
