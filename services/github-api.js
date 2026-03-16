@@ -180,5 +180,20 @@ export const GitHubAPI = {
    */
   async getRateLimit() {
     return fetchGitHub("/rate_limit");
+  },
+
+  /**
+   * GIST METHODS
+   */
+
+  async getGist(gistId) {
+    return fetchGitHub(`/gists/${gistId}`);
+  },
+
+  async updateGist(gistId, files) {
+    return fetchGitHub(`/gists/${gistId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ files })
+    });
   }
 };

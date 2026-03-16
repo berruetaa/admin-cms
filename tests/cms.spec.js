@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Admin CMS Functionality', () => {
   test.beforeEach(async ({ page }) => {
+    // Set a fake Gist ID for testing in config BEFORE navigation if possible
+    await page.addInitScript(() => {
+        window.GIST_ID_MOCK = 'test-gist-id';
+    });
+
     // Mock GitHub API for authentication and initial data
     await page.route('https://api.github.com/user', async (route) => {
       await route.fulfill({ json: { login: 'testuser' } });
@@ -36,27 +41,27 @@ test.describe('Admin CMS Functionality', () => {
       resources: []
     };
 
-    // Mock getting the file
-    await page.route('**/repos/berruetaa/berrueta-site/contents/academico/data.json*', async (route) => {
-        await route.fulfill({
-          json: {
-            sha: 'old-sha',
-            content: Buffer.from(JSON.stringify(mockData)).toString('base64'),
-            encoding: 'base64'
-          }
-        });
+    // Mock getting the Gist
+    await page.route(url => url.href.includes('/gists/test-gist-id'), async (route) => {
+        if (route.request().method() === 'GET') {
+            await route.fulfill({
+              json: {
+                files: {
+                    "data.json": {
+                        content: JSON.stringify(mockData)
+                    }
+                }
+              }
+            });
+        } else if (route.request().method() === 'PATCH') {
+            capturedBody = JSON.parse(route.request().postData());
+            await route.fulfill({ json: { } });
+        } else {
+            await route.continue();
+        }
     });
 
-    // Mock updating the file
     let capturedBody = null;
-    await page.route('**/repos/berruetaa/berrueta-site/contents/academico/data.json', async (route) => {
-      if (route.request().method() === 'PUT') {
-        capturedBody = JSON.parse(route.request().postData());
-        await route.fulfill({ json: { content: { sha: 'new-sha' } } });
-      } else {
-        await route.continue();
-      }
-    });
 
     await page.click('a[href="#/academico"]');
     await page.click('#btn-new-resource');
@@ -74,7 +79,7 @@ test.describe('Admin CMS Functionality', () => {
     // Wait for the PUT request to be captured
     await expect.poll(() => capturedBody).not.toBeNull();
 
-    const decodedContent = JSON.parse(Buffer.from(capturedBody.content, 'base64').toString());
+    const decodedContent = JSON.parse(capturedBody.files["data.json"].content);
     const savedResource = decodedContent.resources[0];
 
     // Verify schema

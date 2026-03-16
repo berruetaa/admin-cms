@@ -36,19 +36,20 @@ export const Academico = {
     const contentDiv = document.getElementById("academico-content");
 
     try {
-      const file = await GitHubAPI.getFile(REPOS.site, DATA_PATH);
-      this.fileSha = file.sha;
-      this.data = JSON.parse(file.decodedContent);
+      if (REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
+          contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
+          return;
+      }
 
+      const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+      const file = gist.files["data.json"];
+
+      if (!file) throw new Error("data.json no encontrado en el Gist");
+
+      this.data = JSON.parse(file.content);
       this.renderContent(contentDiv);
     } catch (error) {
-      if (error.message.includes("404")) {
-        // File doesn't exist yet, we'll initialize it
-        this.data = { categories: [], resources: [] };
-        this.renderContent(contentDiv);
-      } else {
-        contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-      }
+      contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
     }
   },
 
@@ -106,18 +107,15 @@ export const Academico = {
     container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
   },
 
-  async saveData(message) {
-    const loadingModal = Modal.showLoading("Guardando cambios...");
+  async saveData() {
+    const loadingModal = Modal.showLoading("Guardando cambios en Gist...");
     const content = JSON.stringify(this.data, null, 2);
 
     try {
-      if (this.fileSha) {
-        const response = await GitHubAPI.updateFile(REPOS.site, DATA_PATH, content, message, this.fileSha);
-        this.fileSha = response.content.sha;
-      } else {
-        const response = await GitHubAPI.createFile(REPOS.site, DATA_PATH, content, message);
-        this.fileSha = response.content.sha;
-      }
+      await GitHubAPI.updateGist(REPOS.gists.academico, {
+        "data.json": { content }
+      });
+
       Modal.close(loadingModal);
       this.renderContent(document.getElementById("academico-content"));
     } catch (error) {
@@ -159,14 +157,14 @@ export const Academico = {
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update category ${id}` : `Create category ${formData.id}`);
+      this.saveData();
     });
   },
 
   deleteCategory(id) {
     Modal.showConfirm(`¿Eliminar la categoría ${id}?`, () => {
       this.data.categories = this.data.categories.filter(c => c.id !== id);
-      this.saveData(`Delete category ${id}`);
+      this.saveData();
     });
   },
 
@@ -224,7 +222,7 @@ export const Academico = {
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update resource: ${formData.title}` : `Create resource: ${formData.title}`);
+      this.saveData();
     });
   },
 
@@ -232,7 +230,7 @@ export const Academico = {
     const res = this.data.resources[index];
     Modal.showConfirm(`¿Eliminar el recurso ${res.title}?`, () => {
       this.data.resources.splice(index, 1);
-      this.saveData(`Delete resource: ${res.title}`);
+      this.saveData();
     });
   },
 

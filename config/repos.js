@@ -8,5 +8,8 @@ export const REPOS = {
     owner: "berruetaa",
     repo: "berrueta-site",
     branch: "main"
+  },
+  gists: {
+    get academico() { return window.GIST_ID_MOCK || "YOUR_GIST_ID_HERE"; }
   }
 };
