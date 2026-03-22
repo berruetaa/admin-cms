@@ -12,6 +12,7 @@ export const Academico = {
   data: { categories: [], resources: [] },
   fileSha: null,
   filters: { query: '', category: 'all', group: 'all', subgroup: 'all', type: 'all' },
+  selectedIndices: new Set(),
 
   async render(container) {
     container.innerHTML = `
@@ -144,6 +145,15 @@ export const Academico = {
         </div>
       </div>
 
+      <!-- Barra de Acciones Masivas -->
+      <div id="bulk-action-bar" class="card" style="display:none; justify-content:space-between; align-items:center; margin-bottom:1.5rem; padding:0.75rem 1rem; background: var(--color-accent); color: white;">
+        <span id="bulk-count" style="font-weight: 500;">0 seleccionados</span>
+        <div>
+          <button id="btn-bulk-edit" class="btn btn-sm btn-outline" style="color:white; border-color:white; margin-right: 0.5rem;">✏️ Editar Lote</button>
+          <button id="btn-bulk-delete" class="btn btn-sm btn-danger" style="background: white; color: var(--color-error); border-color: white;">🗑️ Borrar Lote</button>
+        </div>
+      </div>
+
       <div id="resources-table-container"></div>
     `;
 
@@ -163,12 +173,12 @@ export const Academico = {
       this.renderResourcesTable();
     });
     gInput.addEventListener('change', (e) => {
-       this.filters.group = e.target.value;
-       this.renderResourcesTable();
+      this.filters.group = e.target.value;
+      this.renderResourcesTable();
     });
     sInput.addEventListener('change', (e) => {
-       this.filters.subgroup = e.target.value;
-       this.renderResourcesTable();
+      this.filters.subgroup = e.target.value;
+      this.renderResourcesTable();
     });
     tInput.addEventListener('change', (e) => {
       this.filters.type = e.target.value;
@@ -176,6 +186,23 @@ export const Academico = {
     });
 
     this.renderResourcesTable();
+
+    // Eventos de Bulk Actions
+    document.getElementById('btn-bulk-edit').addEventListener('click', () => this.showBulkEditModal());
+    document.getElementById('btn-bulk-delete').addEventListener('click', () => this.deleteBulkSelected());
+  },
+
+  _updateBulkBar() {
+    const bar = document.getElementById('bulk-action-bar');
+    const countLabel = document.getElementById('bulk-count');
+    if (!bar || !countLabel) return;
+
+    if (this.selectedIndices.size > 0) {
+      bar.style.display = 'flex';
+      countLabel.textContent = `${this.selectedIndices.size} recurso(s) seleccionado(s)`;
+    } else {
+      bar.style.display = 'none';
+    }
   },
 
   renderResourcesTable() {
@@ -185,11 +212,11 @@ export const Academico = {
 
     // Aplicar filtros
     const filtered = this.data.resources.filter(res => {
-      const matchQuery = !this.filters.query || 
-        res.title.toLowerCase().includes(this.filters.query) || 
+      const matchQuery = !this.filters.query ||
+        res.title.toLowerCase().includes(this.filters.query) ||
         res.description.toLowerCase().includes(this.filters.query) ||
         (res.tags && res.tags.join(' ').toLowerCase().includes(this.filters.query));
-      
+
       const matchCat = this.filters.category === 'all' || res.category === this.filters.category;
       const matchGroup = this.filters.group === 'all' || res.group === this.filters.group;
       const matchSub = this.filters.subgroup === 'all' || res.subgroup === this.filters.subgroup;
@@ -207,7 +234,12 @@ export const Academico = {
 
     let html = `
       <table class="table">
-        <thead><tr><th>Orden</th><th>Título</th><th>Categoría</th><th>Grupo / Subgrupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th style="width:32px; text-align:center;"><input type="checkbox" id="select-all-res"></th>
+            <th>Orden</th><th>Título</th><th>Categoría</th><th>Grupo / Subgrupo</th><th>Tipo</th><th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
     `;
 
@@ -220,6 +252,9 @@ export const Academico = {
 
       html += `
         <tr>
+          <td style="width:32px; text-align:center;">
+            <input type="checkbox" class="res-checkbox" data-index="${originalIndex}" ${this.selectedIndices.has(originalIndex) ? 'checked' : ''}>
+          </td>
           <td class="actions" style="white-space:nowrap;">
             <button class="btn btn-sm btn-outline btn-move-up" data-index="${originalIndex}" ${originalIndex === 0 ? 'disabled' : ''} title="Subir">▲</button>
             <button class="btn btn-sm btn-outline btn-move-down" data-index="${originalIndex}" ${originalIndex === total - 1 ? 'disabled' : ''} title="Bajar">▼</button>
@@ -249,6 +284,50 @@ export const Academico = {
     container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
     container.querySelectorAll('.btn-move-up').forEach(btn => btn.addEventListener('click', (e) => this.moveResource(parseInt(e.target.dataset.index), -1)));
     container.querySelectorAll('.btn-move-down').forEach(btn => btn.addEventListener('click', (e) => this.moveResource(parseInt(e.target.dataset.index), 1)));
+
+    // Eventos Checkboxes
+    const selectAllCheckbox = document.getElementById('select-all-res');
+    const rowCheckboxes = container.querySelectorAll('.res-checkbox');
+
+    if (selectAllCheckbox) {
+      // Determinar si todos los visibles están seleccionados
+      const allVisibleSelected = filtered.length > 0 && filtered.every(res => {
+        const i = this.data.resources.indexOf(res);
+        return this.selectedIndices.has(i);
+      });
+      selectAllCheckbox.checked = allVisibleSelected;
+
+      selectAllCheckbox.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        filtered.forEach(res => {
+          const i = this.data.resources.indexOf(res);
+          if (isChecked) this.selectedIndices.add(i);
+          else this.selectedIndices.delete(i);
+        });
+        this.renderResourcesTable(); // re-render para checkboxes
+      });
+    }
+
+    rowCheckboxes.forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const i = parseInt(e.target.dataset.index);
+        if (e.target.checked) this.selectedIndices.add(i);
+        else this.selectedIndices.delete(i);
+        
+        // Update Select All state without full re-render
+        if (selectAllCheckbox) {
+          const allVisibleSelected = filtered.length > 0 && filtered.every(res => {
+            const idx = this.data.resources.indexOf(res);
+            return this.selectedIndices.has(idx);
+          });
+          selectAllCheckbox.checked = allVisibleSelected;
+        }
+        
+        this._updateBulkBar();
+      });
+    });
+
+    this._updateBulkBar();
   },
 
   async saveData() {
@@ -297,11 +376,15 @@ export const Academico = {
 
       if (isEdit) {
         const index = this.data.categories.findIndex(c => c.id === id);
+        const oldCat = this.data.categories[index];
+        const oldId = oldCat.id;
+        
         // keep old url if exists
-        formData.url = this.data.categories[index].url || formData.url;
+        formData.url = oldCat.url || formData.url;
         this.data.categories[index] = formData;
+        
         Modal.close(overlay);
-        this.saveData();
+        this.updateCategoryCascade(oldId, formData);
       } else {
         // Validate unique ID
         if (!Validators.isCategoryIdUnique(formData.id, this.data.categories)) {
@@ -314,10 +397,87 @@ export const Academico = {
     });
   },
 
-  async createCategoryAndSave(formData) {
-    const loadingModal = Modal.showLoading(`Creando categoría ${formData.id}...`);
+  async updateCategoryCascade(oldId, newCat) {
+    const isIdChanged = oldId !== newCat.id;
+    const loadingMessage = isIdChanged 
+      ? `Actualizando categoría y migrando archivos...` 
+      : `Actualizando categoría ${newCat.name}...`;
+      
+    const loadingModal = Modal.showLoading(loadingMessage);
+
     try {
-      const template = `<!DOCTYPE html>
+      // 1. Generate updated HTML content
+      const { Base64 } = await import("../utils/base64.js");
+      const template = this._generateCategoryTemplate(newCat);
+      const base64Content = Base64.encode(template);
+
+      if (isIdChanged) {
+        // A. Cascade update resources
+        this.data.resources.forEach(res => {
+          if (res.category === oldId) {
+            res.category = newCat.id;
+          }
+        });
+
+        // B. GitHub Migration: Create new FIRST
+        await GitHubAPI.createFile(
+          REPOS.site, 
+          `academico/${newCat.id}/index.html`, 
+          base64Content, 
+          `Migrate category: ${oldId} -> ${newCat.id}`
+        );
+
+        // C. GitHub Migration: Delete old LAST
+        try {
+          const fileData = await GitHubAPI.getFile(REPOS.site, `academico/${oldId}/index.html`);
+          await GitHubAPI.deleteFile(
+            REPOS.site, 
+            `academico/${oldId}/index.html`, 
+            `Remove migrated category: ${oldId}`, 
+            fileData.sha
+          );
+        } catch (e) {
+          console.warn(`Could not delete old file academico/${oldId}/index.html:`, e);
+        }
+        
+      } else {
+        // Just update existing file in GitHub
+        try {
+          const fileData = await GitHubAPI.getFile(REPOS.site, `academico/${newCat.id}/index.html`);
+          await GitHubAPI.updateFile(
+            REPOS.site,
+            `academico/${newCat.id}/index.html`,
+            base64Content,
+            `Update category template: ${newCat.name}`,
+            fileData.sha
+          );
+        } catch (e) {
+          // If file doesn't exist, create it
+          if (e.message.includes('404') || e.message.includes('Not Found')) {
+            await GitHubAPI.createFile(
+              REPOS.site, 
+              `academico/${newCat.id}/index.html`, 
+              base64Content, 
+              `Create category template: ${newCat.name}`
+            );
+          } else {
+            throw e;
+          }
+        }
+      }
+
+      Modal.close(loadingModal);
+      await this.saveData();
+      Sitemap.update();
+      
+    } catch (e) {
+      Modal.close(loadingModal);
+      Modal.showError(`Error en actualización de categoría: ${e.message}`);
+    }
+  },
+
+  _generateCategoryTemplate(cat) {
+    return `<!DOCTYPE html>
 <html lang="es" data-theme="light">
   <head>
     <meta charset="UTF-8" />
@@ -358,9 +518,9 @@ export const Academico = {
           Volver a categorías
         </a>
         <br>
-        <h1 class="academic-title">${formData.name}</h1>
-        <p class="academic-subtitle">${formData.description}</p>
-        <div id="resources-container" data-category="${formData.id}"></div>
+        <h1 class="academic-title">${cat.name}</h1>
+        <p class="academic-subtitle">${cat.description}</p>
+        <div id="resources-container" data-category="${cat.id}"></div>
       </div>
     </main>
     <footer class="footer"></footer>
@@ -368,6 +528,12 @@ export const Academico = {
     <script type="module" src="/src/js/academico.js"></script>
   </body>
 </html>`;
+  },
+
+  async createCategoryAndSave(formData) {
+    const loadingModal = Modal.showLoading(`Creando categoría ${formData.id}...`);
+    try {
+      const template = this._generateCategoryTemplate(formData);
       const { Base64 } = await import("../utils/base64.js");
       const base64Content = Base64.encode(template);
       await GitHubAPI.createFile(REPOS.site, `academico/${formData.id}/index.html`, base64Content, `Crear categoría: ${formData.name}`);
@@ -624,6 +790,171 @@ export const Academico = {
     const resources = this.data.resources;
     [resources[index], resources[newIndex]] = [resources[newIndex], resources[index]];
     this.saveData();
+  },
+
+  deleteBulkSelected() {
+    Modal.showConfirm(`¿Eliminar los ${this.selectedIndices.size} recursos seleccionados?`, () => {
+      // Sort indices descending to splice correctly
+      const indices = Array.from(this.selectedIndices).sort((a, b) => b - a);
+      indices.forEach(index => {
+        this.data.resources.splice(index, 1);
+      });
+      this.selectedIndices.clear();
+      this.saveData();
+    });
+  },
+
+  showBulkEditModal() {
+    const catOptions = [{ value: "", label: "-- Sin Cambio --" }, ...this.data.categories.map(c => ({ value: c.id, label: c.name }))];
+    const typeOptions = [
+      { value: "", label: "-- Sin Cambio --" },
+      { value: "link", label: "Enlace Externo" },
+      { value: "pdf", label: "Archivo (PDF/Epub)" },
+      { value: "texto", label: "Texto / Artículo" }
+    ];
+
+    const allGroups = [...new Set(this.data.resources.map(r => r.group).filter(Boolean))].sort();
+    const allSubgroups = [...new Set(this.data.resources.map(r => r.subgroup).filter(Boolean))].sort();
+
+    const overlay = Modal.create(
+      `Edición Masiva (${this.selectedIndices.size} recursos)`,
+      `
+        <form id="bulk-form">
+          <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.9rem;">Deje en blanco los campos que no desea modificar.</p>
+          
+          <div style="display:flex; gap:1rem;">
+            <div style="flex:1;">
+              ${Form.renderField({ id: "bulk-category", label: "Categoría", value: "", type: "select", options: catOptions })}
+            </div>
+            <div style="flex:1;">
+               ${Form.renderField({ id: "bulk-type", label: "Tipo", value: "", type: "select", options: typeOptions })}
+            </div>
+          </div>
+
+          <div style="display:flex; gap:1rem;">
+            <div class="form-group" style="flex:1;">
+              <label for="bulk-group">Grupo</label>
+              <input type="text" id="bulk-group" class="form-control" list="bulk-group-list" placeholder="-- Sin Cambio --">
+              <datalist id="bulk-group-list">
+                ${allGroups.map(g => `<option value="${g}">`).join('')}
+              </datalist>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label for="bulk-subgroup">Subgrupo</label>
+              <input type="text" id="bulk-subgroup" class="form-control" list="bulk-sub-list" placeholder="-- Sin Cambio --">
+              <datalist id="bulk-sub-list">
+                ${allSubgroups.map(s => `<option value="${s}">`).join('')}
+              </datalist>
+            </div>
+          </div>
+
+          ${Form.renderField({ id: "bulk-description", label: "Descripción", value: '', type: "textarea", rows: 2, placeholder: "-- Sin Cambio --" })}
+          
+          <div style="display:flex; gap:1rem; align-items:flex-end;">
+            <div style="flex:2;">
+              ${Form.renderField({ id: "bulk-tags", label: "Tags (separados por coma)", value: '', type: "text", placeholder: "-- Sin Cambio --" })}
+            </div>
+            <div style="flex:1; margin-bottom: 1rem;">
+               <label><input type="radio" name="tags-mode" value="append" checked> Agregar (Append)</label><br>
+               <label><input type="radio" name="tags-mode" value="overwrite"> Sobreescribir</label>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:1rem;">
+            <div style="flex:1;">
+              ${Form.renderField({ id: "bulk-prefix", label: "Prefijo de Título", value: "", type: "text", placeholder: "Ej: [Unidad 1] " })}
+            </div>
+            <div style="flex:1;">
+              ${Form.renderField({ id: "bulk-suffix", label: "Sufijo de Título", value: "", type: "text", placeholder: " Ej: (Actualizado)" })}
+            </div>
+          </div>
+        </form>
+      `,
+      `
+        <button class="btn btn-secondary" id="bulk-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="bulk-save">Aplicar a ${this.selectedIndices.size} recursos</button>
+      `
+    );
+
+    overlay.querySelector("#bulk-cancel").addEventListener("click", () => Modal.close(overlay));
+    overlay.querySelector("#bulk-save").addEventListener("click", () => {
+      const form = overlay.querySelector("#bulk-form");
+      
+      const changes = {
+        category: form.querySelector("#bulk-category").value,
+        type: form.querySelector("#bulk-type").value,
+        group: form.querySelector("#bulk-group").value.trim(),
+        subgroup: form.querySelector("#bulk-subgroup").value.trim(),
+        description: form.querySelector("#bulk-description").value.trim(),
+        tags: form.querySelector("#bulk-tags").value,
+        tagsMode: form.querySelector('input[name="tags-mode"]:checked').value,
+        prefix: form.querySelector("#bulk-prefix").value,
+        suffix: form.querySelector("#bulk-suffix").value,
+      };
+
+      Modal.close(overlay);
+      this.applyBulkEdit(changes);
+    });
+  },
+
+  applyBulkEdit(changes) {
+    const indices = Array.from(this.selectedIndices);
+    
+    // Process tags array if provided
+    let newTags = [];
+    if (changes.tags) {
+      newTags = changes.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+
+    indices.forEach(index => {
+      const res = this.data.resources[index];
+      
+      if (changes.category) res.category = changes.category;
+      if (changes.type) res.type = changes.type;
+      if (changes.group) res.group = changes.group;
+      if (changes.subgroup) res.subgroup = changes.subgroup;
+      if (changes.description) res.description = changes.description;
+
+      if (changes.tags) {
+        if (changes.tagsMode === 'overwrite') {
+          res.tags = [...newTags];
+        } else {
+          // append
+          const existing = res.tags || [];
+          res.tags = [...new Set([...existing, ...newTags])];
+        }
+      }
+
+      if (changes.prefix) res.title = changes.prefix + res.title;
+      if (changes.suffix) res.title = res.title + changes.suffix;
+    });
+
+    this.selectedIndices.clear();
+    this.saveData();
+  },
+
+  _renameGroupInResources(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return;
+    let modified = false;
+    this.data.resources.forEach(res => {
+      if (res.group === oldName) {
+        res.group = newName;
+        modified = true;
+      }
+    });
+    if (modified) this.saveData();
+  },
+
+  _renameSubgroupInResources(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return;
+    let modified = false;
+    this.data.resources.forEach(res => {
+      if (res.subgroup === oldName) {
+        res.subgroup = newName;
+        modified = true;
+      }
+    });
+    if (modified) this.saveData();
   },
 
   exportData() {

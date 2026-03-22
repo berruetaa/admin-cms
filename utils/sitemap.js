@@ -76,10 +76,13 @@ export const Sitemap = {
         sha = existing.sha;
       } catch (_) { /* 404 is fine */ }
 
+      const { Base64 } = await import("./base64.js");
+      const encodedXml = Base64.encode(xml);
+
       if (sha) {
-        await GitHubAPI.updateFile(REPOS.site, SITEMAP_PATH, xml, "CMS: update sitemap.xml (full sync)", sha);
+        await GitHubAPI.updateFile(REPOS.site, SITEMAP_PATH, encodedXml, "CMS: update sitemap.xml (full sync)", sha);
       } else {
-        await GitHubAPI.createFile(REPOS.site, SITEMAP_PATH, xml, "CMS: create sitemap.xml (initial sync)");
+        await GitHubAPI.createFile(REPOS.site, SITEMAP_PATH, encodedXml, "CMS: create sitemap.xml (initial sync)");
       }
       console.log("Sitemap updated successfully.");
     } catch (error) {
