@@ -3,12 +3,10 @@ import { REPOS } from "../config/repos.js";
 
 const SITEMAP_PATH = "sitemap.xml";
 const BASE_URL = "https://berrueta.uy";
+const BLOG_PATH = "src/data/blog";
 
 /**
- * Generates a sitemap XML string from categories and blog post slugs.
- * @param {Array<{url: string}>} categories
- * @param {Array<string>} blogSlugs - array of slug strings (without .md)
- * @returns {string} XML string
+ * Builds the complete sitemap XML string.
  */
 function buildSitemapXML(categories, blogSlugs) {
   const now = new Date().toISOString().split('T')[0];
@@ -22,7 +20,7 @@ function buildSitemapXML(categories, blogSlugs) {
   ];
 
   const categoryUrls = categories.map(cat => ({
-    loc: cat.url || `/academico/${cat.id}/`,
+    loc: `/academico/${cat.id}/`,
     priority: '0.8'
   }));
 
@@ -47,28 +45,45 @@ function buildSitemapXML(categories, blogSlugs) {
 
 export const Sitemap = {
   /**
-   * Reads the current sitemap SHA, rebuilds it and commits.
-   * @param {Array<{url: string, id: string}>} categories
-   * @param {Array<string>} blogSlugs
+   * Fetches the full list of categories and blog posts to ensure sitemap is complete.
    */
-  async update(categories, blogSlugs = []) {
+  async update() {
     try {
+      // 1. Fetch categories from Gist (used in Académico)
+      let categories = [];
+      try {
+        const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+        const data = JSON.parse(gist.files["data.json"].content);
+        categories = data.categories || [];
+      } catch (e) { console.warn("Sitemap: couldn't fetch categories", e); }
+
+      // 2. Fetch blog posts from Repo (used in Blog)
+      let blogSlugs = [];
+      try {
+        const files = await GitHubAPI.getDirectory(REPOS.blog, BLOG_PATH);
+        blogSlugs = files
+          .filter(f => f.name.endsWith('.md'))
+          .map(f => f.name.replace('.md', ''));
+      } catch (e) { console.warn("Sitemap: couldn't fetch blog slugs", e); }
+
+      // 3. Build XML
+      const xml = buildSitemapXML(categories, blogSlugs);
+
+      // 4. Update or create sitemap.xml in REPOS.site
       let sha = null;
       try {
         const existing = await GitHubAPI.getFile(REPOS.site, SITEMAP_PATH);
         sha = existing.sha;
-      } catch (_) { /* file may not exist yet */ }
-
-      const xml = buildSitemapXML(categories, blogSlugs);
+      } catch (_) { /* 404 is fine */ }
 
       if (sha) {
-        await GitHubAPI.updateFile(REPOS.site, SITEMAP_PATH, xml, "CMS: update sitemap.xml", sha);
+        await GitHubAPI.updateFile(REPOS.site, SITEMAP_PATH, xml, "CMS: update sitemap.xml (full sync)", sha);
       } else {
-        await GitHubAPI.createFile(REPOS.site, SITEMAP_PATH, xml, "CMS: create sitemap.xml");
+        await GitHubAPI.createFile(REPOS.site, SITEMAP_PATH, xml, "CMS: create sitemap.xml (initial sync)");
       }
-    } catch (e) {
-      console.warn("Sitemap update failed:", e.message);
-      // Non-critical, don't throw
+      console.log("Sitemap updated successfully.");
+    } catch (error) {
+      console.error("Sitemap critical error:", error);
     }
   }
 };

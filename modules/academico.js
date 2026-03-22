@@ -246,7 +246,7 @@ export const Academico = {
       this.data.categories.push(formData);
       Modal.close(loadingModal);
       this.saveData();
-      Sitemap.update(this.data.categories);
+      Sitemap.update();
     } catch (e) {
       Modal.close(loadingModal);
       Modal.showError(`Error al crear la categoría: ${e.message}`);
@@ -272,7 +272,7 @@ export const Academico = {
       this.data.categories = this.data.categories.filter(c => c.id !== id);
       Modal.close(loadingModal);
       this.saveData();
-      Sitemap.update(this.data.categories);
+      Sitemap.update();
     });
   },
 

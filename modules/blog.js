@@ -251,10 +251,7 @@ export const Blog = {
         Modal.close(loadingModal);
         Modal.close(overlay);
         // Update sitemap
-        const slugs = (await GitHubAPI.getDirectory(REPOS.blog, BLOG_PATH))
-          .filter(f => f.name.endsWith('.md'))
-          .map(f => f.name.replace('.md',''));
-        Sitemap.update([], slugs);
+        Sitemap.update();
         this.loadPosts();
       } catch (error) {
         Modal.close(loadingModal);
@@ -335,10 +332,7 @@ export const Blog = {
         await GitHubAPI.deleteFile(REPOS.blog, path, `Delete blog post: ${path}`, sha);
         Modal.close(loadingModal);
         // Update sitemap
-        const slugs = (await GitHubAPI.getDirectory(REPOS.blog, BLOG_PATH))
-          .filter(f => f.name.endsWith('.md') && f.path !== path)
-          .map(f => f.name.replace('.md',''));
-        Sitemap.update([], slugs);
+        Sitemap.update();
         this.loadPosts();
       } catch (error) {
         Modal.close(loadingModal);
