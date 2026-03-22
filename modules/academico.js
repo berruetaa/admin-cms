@@ -11,6 +11,7 @@ const DATA_PATH = "academico/data.json";
 export const Academico = {
   data: { categories: [], resources: [] },
   fileSha: null,
+  filters: { query: '', category: 'all', group: 'all', subgroup: 'all', type: 'all' },
 
   async render(container) {
     container.innerHTML = `
@@ -60,6 +61,19 @@ export const Academico = {
   },
 
   renderContent(container) {
+    container.innerHTML = `
+      <section id="categories-section"></section>
+      <section id="resources-section" style="margin-top: 3rem;"></section>
+    `;
+
+    this.renderCategoriesTable();
+    this.renderResourcesSection();
+  },
+
+  renderCategoriesTable() {
+    const section = document.getElementById('categories-section');
+    if (!section) return;
+
     let html = `
       <h3>Categorías</h3>
       <table class="table">
@@ -80,29 +94,147 @@ export const Academico = {
       `;
     });
 
-    html += `</tbody></table>
-      <h3 style="margin-top: 2rem;">Recursos</h3>
+    html += `</tbody></table>`;
+    section.innerHTML = html;
+
+    section.querySelectorAll('.btn-edit-cat').forEach(btn => btn.addEventListener('click', (e) => this.showCategoryModal(e.target.dataset.id)));
+    section.querySelectorAll('.btn-delete-cat').forEach(btn => btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id)));
+  },
+
+  renderResourcesSection() {
+    const section = document.getElementById('resources-section');
+    if (!section) return;
+
+    section.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items: baseline; margin-bottom:1rem;">
+        <h3>Recursos</h3>
+        <span class="text-muted" id="resource-count" style="font-size:0.85rem;"></span>
+      </div>
+
+      <!-- Barra de Filtros -->
+      <div class="filter-bar card" style="display:flex; gap:0.5rem; margin-bottom:1.5rem; padding:0.75rem; flex-wrap:wrap; font-size:0.85rem; background: var(--color-muted);">
+        <div style="flex:2.5; min-width:180px;">
+          <input type="text" id="filter-query" class="form-control" style="padding: 0.5rem;" placeholder="🔍 Buscar recurso..." value="${this.filters.query}">
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <select id="filter-category" class="form-control" style="padding: 0.5rem;">
+            <option value="all">Categoría (Todos)</option>
+            ${this.data.categories.map(c => `<option value="${c.id}" ${this.filters.category === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <select id="filter-group" class="form-control" style="padding: 0.5rem;">
+            <option value="all">Grupo (Todos)</option>
+            ${[...new Set(this.data.resources.map(r => r.group).filter(Boolean))].sort().map(g => `<option value="${g}" ${this.filters.group === g ? 'selected' : ''}>${g}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <select id="filter-subgroup" class="form-control" style="padding: 0.5rem;">
+            <option value="all">Sub (Todos)</option>
+            ${[...new Set(this.data.resources.map(r => r.subgroup).filter(Boolean))].sort().map(s => `<option value="${s}" ${this.filters.subgroup === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:0.8; min-width:100px;">
+          <select id="filter-type" class="form-control" style="padding: 0.5rem;">
+            <option value="all">Tipo</option>
+            <option value="link" ${this.filters.type === 'link' ? 'selected' : ''}>Link</option>
+            <option value="pdf" ${this.filters.type === 'pdf' ? 'selected' : ''}>PDF</option>
+            <option value="texto" ${this.filters.type === 'texto' ? 'selected' : ''}>Txt</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="resources-table-container"></div>
+    `;
+
+    // Eventos de filtros
+    const qInput = document.getElementById('filter-query');
+    const cInput = document.getElementById('filter-category');
+    const gInput = document.getElementById('filter-group');
+    const sInput = document.getElementById('filter-subgroup');
+    const tInput = document.getElementById('filter-type');
+
+    qInput.addEventListener('input', (e) => {
+      this.filters.query = e.target.value.toLowerCase();
+      this.renderResourcesTable();
+    });
+    cInput.addEventListener('change', (e) => {
+      this.filters.category = e.target.value;
+      this.renderResourcesTable();
+    });
+    gInput.addEventListener('change', (e) => {
+       this.filters.group = e.target.value;
+       this.renderResourcesTable();
+    });
+    sInput.addEventListener('change', (e) => {
+       this.filters.subgroup = e.target.value;
+       this.renderResourcesTable();
+    });
+    tInput.addEventListener('change', (e) => {
+      this.filters.type = e.target.value;
+      this.renderResourcesTable();
+    });
+
+    this.renderResourcesTable();
+  },
+
+  renderResourcesTable() {
+    const container = document.getElementById('resources-table-container');
+    const countSpan = document.getElementById('resource-count');
+    if (!container) return;
+
+    // Aplicar filtros
+    const filtered = this.data.resources.filter(res => {
+      const matchQuery = !this.filters.query || 
+        res.title.toLowerCase().includes(this.filters.query) || 
+        res.description.toLowerCase().includes(this.filters.query) ||
+        (res.tags && res.tags.join(' ').toLowerCase().includes(this.filters.query));
+      
+      const matchCat = this.filters.category === 'all' || res.category === this.filters.category;
+      const matchGroup = this.filters.group === 'all' || res.group === this.filters.group;
+      const matchSub = this.filters.subgroup === 'all' || res.subgroup === this.filters.subgroup;
+      const matchType = this.filters.type === 'all' || res.type === this.filters.type;
+
+      return matchQuery && matchCat && matchGroup && matchSub && matchType;
+    });
+
+    if (countSpan) countSpan.textContent = `Mostrando ${filtered.length} de ${this.data.resources.length} recursos`;
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="card" style="text-align:center; padding:2rem; color:#888;">No se encontraron recursos con estos filtros.</div>`;
+      return;
+    }
+
+    let html = `
       <table class="table">
-        <thead><tr><th>Orden</th><th>Título</th><th>Categoría</th><th>Grupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Orden</th><th>Título</th><th>Categoría</th><th>Grupo / Subgrupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
         <tbody>
     `;
 
-    const total = this.data.resources.length;
-    this.data.resources.forEach((res, index) => {
+    filtered.forEach((res) => {
+      // Find original index to maintain functionality of move/edit/delete
+      // Note: Reordering ▲▼ only makes sense if not filtered, 
+      // but we allow it by finding original index
+      const originalIndex = this.data.resources.indexOf(res);
+      const total = this.data.resources.length;
+
       html += `
         <tr>
           <td class="actions" style="white-space:nowrap;">
-            <button class="btn btn-sm btn-outline btn-move-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Subir">▲</button>
-            <button class="btn btn-sm btn-outline btn-move-down" data-index="${index}" ${index === total - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+            <button class="btn btn-sm btn-outline btn-move-up" data-index="${originalIndex}" ${originalIndex === 0 ? 'disabled' : ''} title="Subir">▲</button>
+            <button class="btn btn-sm btn-outline btn-move-down" data-index="${originalIndex}" ${originalIndex === total - 1 ? 'disabled' : ''} title="Bajar">▼</button>
           </td>
           <td>${res.title}</td>
-          <td>${res.category}</td>
-          <td>${res.group || '-'}</td>
-          <td>${res.type}</td>
+          <td><span class="text-muted" style="font-size:0.8rem;">${res.category}</span></td>
+          <td style="font-size:0.9rem;">
+            <strong>${res.group || '-'}</strong>
+            ${res.subgroup ? `<span style="color:#888; margin:0 4px;">›</span> <span style="color:#555;">${res.subgroup}</span>` : ''}
+          </td>
+          <td><span class="search-result-section" style="font-size:0.75rem;">${res.type}</span></td>
           <td class="actions">
-            <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${index}">Editar</button>
-            <button class="btn btn-sm btn-warning btn-duplicate-res" data-index="${index}">Duplicar</button>
-            <button class="btn btn-sm btn-danger btn-delete-res" data-index="${index}">Borrar</button>
+            <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${originalIndex}">Editar</button>
+            <button class="btn btn-sm btn-warning btn-duplicate-res" data-index="${originalIndex}">Duplicar</button>
+            <button class="btn btn-sm btn-danger btn-delete-res" data-index="${originalIndex}">Borrar</button>
           </td>
         </tr>
       `;
@@ -111,10 +243,7 @@ export const Academico = {
     html += `</tbody></table>`;
     container.innerHTML = html;
 
-    // Events
-    container.querySelectorAll('.btn-edit-cat').forEach(btn => btn.addEventListener('click', (e) => this.showCategoryModal(e.target.dataset.id)));
-    container.querySelectorAll('.btn-delete-cat').forEach(btn => btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id)));
-
+    // Events (re-bind because we replaced the HTML)
     container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.index)));
     container.querySelectorAll('.btn-duplicate-res').forEach(btn => btn.addEventListener('click', (e) => this.duplicateResource(e.target.dataset.index)));
     container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
@@ -293,7 +422,22 @@ export const Academico = {
         <form id="res-form">
           ${Form.renderField({ id: "title", label: "Título", value: isEdit ? res.title : '', required: true, type: "text" })}
           ${Form.renderField({ id: "category", label: "Categoría", value: isEdit ? res.category : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
-          ${Form.renderField({ id: "group", label: "Grupo", value: isEdit ? res.group : '', required: true, type: "text" })}
+          <div style="display:flex; gap:1rem;">
+            <div class="form-group" style="flex:1;">
+              <label for="group">Grupo (Ej: 1er Año, Prácticos)</label>
+              <input type="text" id="group" class="form-control" list="group-list" value="${isEdit ? res.group : ''}" required>
+              <datalist id="group-list">
+                ${[...new Set(this.data.resources.map(r => r.group).filter(Boolean))].map(g => `<option value="${g}">`).join('')}
+              </datalist>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label for="subgroup">Subgrupo (Ej: Química CFE)</label>
+              <input type="text" id="subgroup" class="form-control" list="sub-list" value="${isEdit && res.subgroup ? res.subgroup : ''}">
+              <datalist id="sub-list">
+                ${[...new Set(this.data.resources.map(r => r.subgroup).filter(Boolean))].map(s => `<option value="${s}">`).join('')}
+              </datalist>
+            </div>
+          </div>
           ${Form.renderField({ id: "tags", label: "Tags (separados por coma)", value: isEdit && res.tags ? res.tags.join(', ') : '', type: "text" })}
           ${Form.renderField({ id: "type", label: "Tipo", value: isEdit ? res.type : 'link', required: true, type: "select", options: typeOptions })}
           
@@ -353,6 +497,7 @@ export const Academico = {
         title: titleVal,
         category: form.querySelector("#category").value,
         group: form.querySelector("#group").value.trim(),
+        subgroup: form.querySelector("#subgroup").value.trim(),
         type: typeVal,
         description: form.querySelector("#description").value.trim()
       };
@@ -420,9 +565,9 @@ export const Academico = {
     <article class="article-container">
       <a href="/academico/" class="back-link">&larr; Volver a Académico</a>
       <h1 class="article-title">${baseData.title}</h1>
-      <div class="article-meta">Recurso de ${baseData.category} | ${baseData.group}</div>
+      <div class="article-meta">Recurso de ${baseData.category} | ${baseData.group}${baseData.subgroup ? ' | ' + baseData.subgroup : ''}</div>
       <div class="article-content">
-        ${contentVal.replace(/\\n/g, '<br>')}
+        ${contentVal.replace(/\n/g, '<br>')}
       </div>
     </article>
   </main>
