@@ -6,6 +6,7 @@ import { Modal } from "../components/modal.js";
 import { Autosave } from "../utils/autosave.js";
 import { Sitemap } from "../utils/sitemap.js";
 import { SearchDataStore } from "../components/navbar.js";
+import { PreviewGenerator } from "../utils/preview-generator.js";
 
 const BLOG_PATH = "src/data/blog";
 const EASYMDE_JS = "https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js";
@@ -165,6 +166,7 @@ export const Blog = {
       `,
       `
         <button class="btn btn-secondary" id="editor-cancel">Cancelar</button>
+        <button class="btn btn-outline" id="editor-preview" style="border-color:var(--color-accent); color:var(--color-accent);">👁️ Vista Previa</button>
         <button class="btn btn-primary" id="editor-save">Guardar en GitHub</button>
       `
     );
@@ -207,6 +209,13 @@ export const Blog = {
     overlay.querySelector("#editor-cancel").addEventListener("click", () => {
       clearInterval(autosaveTimer);
       Modal.close(overlay);
+    });
+
+    overlay.querySelector("#editor-preview").addEventListener("click", () => {
+      const form = overlay.querySelector("#post-form");
+      const formData = this._collectFormData(form, easyMDE);
+      const html = PreviewGenerator.blog(formData, easyMDE.value());
+      Modal.showPreview(formData.title || "Artículo", html);
     });
 
     overlay.querySelector("#editor-save").addEventListener("click", async () => {

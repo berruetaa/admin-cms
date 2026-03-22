@@ -69,7 +69,22 @@ export const Modal = {
       `<p class="text-danger">${message}</p>`,
       `<button class="btn btn-primary" id="error-ok">Entendido</button>`
     );
-
     overlay.querySelector('#error-ok').addEventListener('click', () => this.close(overlay));
+  },
+
+  showPreview(title, html) {
+    const overlay = this.create(
+      `Vista Previa: ${title}`,
+      `<iframe id="preview-iframe" style="width:100%; height:80vh; border:none; border-radius:4px; background:#fff;"></iframe>`,
+      `<button class="btn btn-primary" id="preview-ok">Cerrar Preview</button>`
+    );
+
+    const iframe = overlay.querySelector('#preview-iframe');
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    overlay.querySelector('#preview-ok').addEventListener('click', () => this.close(overlay));
   }
 };

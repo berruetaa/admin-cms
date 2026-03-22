@@ -2,6 +2,7 @@ import { GitHubAPI } from "../services/github-api.js";
 import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
+import { PreviewGenerator } from "../utils/preview-generator.js";
 
 const FILE_NAME = "homepage.json";
 
@@ -13,6 +14,9 @@ export const Homepage = {
       <div class="module-header">
         <h2>Gestión de Homepage</h2>
         <div class="header-actions">
+           <button id="btn-preview-homepage" class="btn btn-outline" style="border-color:var(--color-accent); color:var(--color-accent);">👁️ Vista Previa</button>
+           <button id="btn-export-homepage" class="btn btn-outline">Exportar JSON</button>
+           <button id="btn-import-homepage" class="btn btn-outline">Importar JSON</button>
            <button id="btn-save-homepage" class="btn btn-primary" disabled>Guardar Cambios</button>
         </div>
       </div>
@@ -22,6 +26,12 @@ export const Homepage = {
     `;
 
     document.getElementById('btn-save-homepage').addEventListener('click', () => this.saveData());
+    document.getElementById("btn-export-homepage").addEventListener("click", () => this.exportData());
+    document.getElementById("btn-import-homepage").addEventListener("click", () => this.importData());
+    document.getElementById("btn-preview-homepage").addEventListener("click", () => {
+        const html = PreviewGenerator.homepage(this.data);
+        Modal.showPreview("Página de Inicio", html);
+    });
 
     await this.loadData();
   },
@@ -327,5 +337,44 @@ export const Homepage = {
       Modal.close(loadingModal);
       Modal.showError(`Error al guardar: ${error.message}`);
     }
+  },
+
+  exportData() {
+    const json = JSON.stringify(this.data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'homepage.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        
+        // Basic validation: must have hero/cta/sections
+        if (!parsed.hero || !parsed.cta || !parsed.sections) {
+            throw new Error('El JSON no tiene el formato correcto para la Homepage (faltan hero, cta o sections).');
+        }
+
+        Modal.showConfirm(`¿Reemplazar la configuración actual de la Homepage con la del archivo?`, async () => {
+          this.data = parsed;
+          await this.saveData();
+          this.renderContent(document.getElementById("homepage-content"));
+        });
+      } catch (err) {
+        Modal.showError(`JSON inválido: ${err.message}`);
+      }
+    };
+    input.click();
   }
 };

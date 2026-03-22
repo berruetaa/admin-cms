@@ -2,6 +2,7 @@ import { GitHubAPI } from "../services/github-api.js";
 import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
+import { PreviewGenerator } from "../utils/preview-generator.js";
 
 const FILE_NAME = "tools.json";
 
@@ -13,6 +14,7 @@ export const Tools = {
       <div class="module-header">
         <h2>Gestión de Herramientas</h2>
         <div class="header-actions">
+          <button id="btn-preview-tools" class="btn btn-outline" style="border-color:var(--color-accent); color:var(--color-accent);">👁️ Vista Previa</button>
           <button id="btn-export-tools" class="btn btn-outline">Exportar JSON</button>
           <button id="btn-import-tools" class="btn btn-outline">Importar JSON</button>
           <button id="btn-new-tool" class="btn btn-primary">Nueva Herramienta</button>
@@ -26,6 +28,10 @@ export const Tools = {
     document.getElementById("btn-new-tool").addEventListener("click", () => this.showToolModal());
     document.getElementById("btn-export-tools").addEventListener("click", () => this.exportData());
     document.getElementById("btn-import-tools").addEventListener("click", () => this.importData());
+    document.getElementById("btn-preview-tools").addEventListener("click", () => {
+        const html = PreviewGenerator.tools(this.data);
+        Modal.showPreview("Herramientas", html);
+    });
 
     await this.loadData();
   },
