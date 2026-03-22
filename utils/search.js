@@ -91,6 +91,25 @@ export const Search = {
       });
     }
 
+    // ── Juegos ───────────────────────────────────────────────────────────────
+    if (datasets.juegos && Array.isArray(datasets.juegos)) {
+      datasets.juegos.forEach(game => {
+        if (
+          game.name?.toLowerCase().includes(q) ||
+          game.description?.toLowerCase().includes(q) ||
+          game.category?.toLowerCase().includes(q)
+        ) {
+          results.push({
+            section: 'Juegos',
+            icon: '🎮',
+            label: game.name,
+            sublabel: `${game.category} › ${game.description || ''}`,
+            hash: '#/juegos'
+          });
+        }
+      });
+    }
+
     return results;
   }
 };

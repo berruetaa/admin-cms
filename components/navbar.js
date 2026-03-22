@@ -5,7 +5,8 @@ import { Search } from "../utils/search.js";
 export const SearchDataStore = {
   blog: [],
   academico: { categories: [], resources: [] },
-  tools: []
+  tools: [],
+  juegos: []
 };
 
 export const Navbar = {
@@ -46,6 +47,7 @@ export const Navbar = {
             <li><a href="#/academico" id="nav-academico" class="nav-link">Académico</a></li>
             <li><a href="#/files" id="nav-files" class="nav-link">Files</a></li>
             <li><a href="#/tools" id="nav-tools" class="nav-link">Tools</a></li>
+            <li><a href="#/juegos" id="nav-juegos" class="nav-link">Juegos</a></li>
             <li><a href="#/system" id="nav-system" class="nav-link">Sistema</a></li>
           </ul>
         </nav>

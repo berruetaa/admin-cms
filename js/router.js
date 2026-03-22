@@ -6,6 +6,7 @@ import { Blog } from "../modules/blog.js";
 import { Academico } from "../modules/academico.js";
 import { Files } from "../modules/files.js";
 import { Tools } from "../modules/tools.js";
+import { Juegos } from "../modules/juegos.js";
 import { System } from "../modules/system.js";
 import { ColorfulTitle } from "../components/ColorfulTitle.js";
 
@@ -16,6 +17,7 @@ const routes = {
   "/academico": Academico,
   "/files": Files,
   "/tools": Tools,
+  "/juegos": Juegos,
   "/system": System
 };
 
