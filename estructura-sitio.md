@@ -100,7 +100,8 @@ A continuación se presenta el árbol de directorios que refleja la estructura *
 
 Esta sección especifica exactamente sobre qué rutas y archivos el CMS tiene permisos de escritura y gestión:
 
-- `academico/data.json`: Archivo principal de datos. El CMS lee, edita, agrega o elimina categorías y recursos académicos de este archivo.
+- `homepage.json` (en Github Gist): Archivo que controla dinámicamente el hero, los enlaces principales (CTAs) y las secciones de la página de inicio. El CMS lee y edita este archivo en el Gist.
+- `academico/data.json` (en Github Gist): Archivo principal de datos académicos. El CMS lee, edita, agrega o elimina categorías y recursos.
 - `academico/*.pdf` (y PDFs dentro de subcarpetas de académico): Archivos de documentos subidos por el CMS como material de estudio. El CMS puede crear y eliminar estos archivos.
 - `assets/images/*` y `assets/img/*`: Archivos de imagen estáticos. El CMS puede subir o eliminar imágenes que luego se referencian en los JSON de datos o en la UI dinámica.
 

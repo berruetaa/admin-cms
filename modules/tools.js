@@ -3,11 +3,10 @@ import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
 
-const TOOLS_PATH = "data/tools.json";
+const FILE_NAME = "tools.json";
 
 export const Tools = {
   data: [],
-  fileSha: null,
 
   async render(container) {
     container.innerHTML = `
@@ -35,32 +34,37 @@ export const Tools = {
     const contentDiv = document.getElementById("tools-content");
 
     try {
-      const file = await GitHubAPI.getFile(REPOS.site, TOOLS_PATH);
-      this.fileSha = file.sha;
-      this.data = JSON.parse(file.decodedContent);
+      if (REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
+        contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
+        return;
+      }
+
+      const gist = await GitHubAPI.getGist(REPOS.gists.academico);
+      const file = gist.files[FILE_NAME];
+
+      if (!file) {
+        // Initialize empty if it doesn't exist yet but gist exists
+        this.data = [];
+      } else {
+        this.data = JSON.parse(file.content);
+      }
 
       this.renderContent(contentDiv);
     } catch (error) {
-      if (error.message.includes("404")) {
-        // Initialize empty array if file doesn't exist
-        this.data = [];
-        this.renderContent(contentDiv);
-      } else {
-        contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-      }
+      contentDiv.innerHTML = `<div class="alert alert-danger">Error al cargar del Gist: ${error.message}</div>`;
     }
   },
 
   renderContent(container) {
     if (this.data.length === 0) {
-      container.innerHTML = "<p>No hay herramientas configuradas.</p>";
+      container.innerHTML = "<p>No hay herramientas configuradas en el Gist.</p>";
       return;
     }
 
     let html = `<table class="table">
       <thead>
         <tr>
-          <th>ID</th>
+          <th>Orden</th>
           <th>Nombre</th>
           <th>Enlace</th>
           <th>Acciones</th>
@@ -70,9 +74,14 @@ export const Tools = {
     `;
 
     this.data.forEach((tool, index) => {
+      const isFirst = index === 0;
+      const isLast = index === this.data.length - 1;
       html += `
         <tr>
-          <td>${tool.id || index}</td>
+          <td class="actions" style="white-space:nowrap; width: 80px;">
+            <button class="btn btn-sm btn-outline btn-move-up" data-index="${index}" ${isFirst ? 'disabled' : ''} title="Subir">▲</button>
+            <button class="btn btn-sm btn-outline btn-move-down" data-index="${index}" ${isLast ? 'disabled' : ''} title="Bajar">▼</button>
+          </td>
           <td>${tool.name}</td>
           <td><a href="${tool.url}" target="_blank">${tool.url}</a></td>
           <td class="actions">
@@ -90,20 +99,27 @@ export const Tools = {
     container.querySelectorAll('.btn-edit-tool').forEach(btn => btn.addEventListener('click', (e) => this.showToolModal(e.target.dataset.index)));
     container.querySelectorAll('.btn-duplicate-tool').forEach(btn => btn.addEventListener('click', (e) => this.duplicateTool(e.target.dataset.index)));
     container.querySelectorAll('.btn-delete-tool').forEach(btn => btn.addEventListener('click', (e) => this.deleteTool(e.target.dataset.index)));
+    container.querySelectorAll('.btn-move-up').forEach(btn => btn.addEventListener('click', (e) => this.moveTool(e.target.dataset.index, -1)));
+    container.querySelectorAll('.btn-move-down').forEach(btn => btn.addEventListener('click', (e) => this.moveTool(e.target.dataset.index, 1)));
   },
 
-  async saveData(message) {
-    const loadingModal = Modal.showLoading("Guardando cambios...");
+  moveTool(index, direction) {
+    const i = parseInt(index);
+    if (i + direction < 0 || i + direction >= this.data.length) return;
+    const temp = this.data[i];
+    this.data[i] = this.data[i + direction];
+    this.data[i + direction] = temp;
+    this.saveData();
+  },
+
+  async saveData() {
+    const loadingModal = Modal.showLoading("Guardando cambios en Gist...");
     const content = JSON.stringify(this.data, null, 2);
 
     try {
-      if (this.fileSha) {
-        const response = await GitHubAPI.updateFile(REPOS.site, TOOLS_PATH, content, message, this.fileSha);
-        this.fileSha = response.content.sha;
-      } else {
-        const response = await GitHubAPI.createFile(REPOS.site, TOOLS_PATH, content, message);
-        this.fileSha = response.content.sha;
-      }
+      await GitHubAPI.updateGist(REPOS.gists.academico, {
+        [FILE_NAME]: { content }
+      });
       Modal.close(loadingModal);
       this.renderContent(document.getElementById("tools-content"));
     } catch (error) {
@@ -120,11 +136,11 @@ export const Tools = {
       isEdit ? "Editar Herramienta" : "Nueva Herramienta",
       `
         <form id="tool-form">
-          ${Form.renderField({ id: "id", label: "ID", value: tool.id, required: true, type: "text" })}
+          ${Form.renderField({ id: "id", label: "ID (interno)", value: tool.id, required: true, type: "text" })}
           ${Form.renderField({ id: "name", label: "Nombre", value: tool.name, required: true, type: "text" })}
           ${Form.renderField({ id: "url", label: "URL", value: tool.url, required: true, type: "text" })}
           ${Form.renderField({ id: "description", label: "Descripción", value: tool.description, type: "textarea", rows: 3 })}
-          ${Form.renderField({ id: "icon", label: "Icono (clase CSS o emoji)", value: tool.icon, type: "text" })}
+          ${Form.renderField({ id: "icon", label: "Icono (emoji o texto opcional)", value: tool.icon || '', type: "text" })}
         </form>
       `,
       `
@@ -151,7 +167,7 @@ export const Tools = {
       }
 
       Modal.close(overlay);
-      this.saveData(isEdit ? `Update tool: ${formData.id}` : `Add tool: ${formData.id}`);
+      this.saveData();
     });
   },
 
@@ -159,7 +175,7 @@ export const Tools = {
     const tool = this.data[index];
     Modal.showConfirm(`¿Eliminar la herramienta ${tool.name}?`, () => {
       this.data.splice(index, 1);
-      this.saveData(`Delete tool: ${tool.name}`);
+      this.saveData();
     });
   },
 
@@ -167,7 +183,7 @@ export const Tools = {
     const tool = this.data[index];
     const copy = { ...tool, id: tool.id + '-copia', name: tool.name + ' (copia)' };
     this.data.splice(Number(index) + 1, 0, copy);
-    this.saveData(`Duplicate tool: ${tool.name}`);
+    this.saveData();
   },
 
   exportData() {
@@ -194,7 +210,7 @@ export const Tools = {
         if (!Array.isArray(parsed)) throw new Error('El JSON debe ser un array de herramientas.');
         Modal.showConfirm(`¿Reemplazar las ${this.data.length} herramientas actuales con las ${parsed.length} del archivo?`, async () => {
           this.data = parsed;
-          await this.saveData('Import tools.json from local backup');
+          await this.saveData();
         });
       } catch (err) {
         Modal.showError(`JSON inválido: ${err.message}`);

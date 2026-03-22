@@ -1,6 +1,7 @@
 import { Router } from './utils/router.js';
 import { LoginComponent } from './components/login.js';
 import { DashboardComponent } from './components/dashboard.js';
+import { HomepageComponent } from './components/homepage.js';
 import { BlogComponent } from './components/blog.js';
 import { AcademicoComponent } from './components/academico.js';
 import { FilesComponent } from './components/files.js';
@@ -12,6 +13,7 @@ import { githubApi } from './services/github-api.js';
 const routes = {
     '/login': LoginComponent,
     '/dashboard': DashboardComponent,
+    '/homepage': HomepageComponent,
     '/blog': BlogComponent,
     '/academico': AcademicoComponent,
     '/files': FilesComponent,

@@ -41,6 +41,7 @@ export const Navbar = {
         <nav class="sidebar-nav">
           <ul>
             <li><a href="#/dashboard" id="nav-dashboard" class="nav-link">Dashboard</a></li>
+            <li><a href="#/homepage" id="nav-homepage" class="nav-link">Homepage</a></li>
             <li><a href="#/blog" id="nav-blog" class="nav-link">Blog</a></li>
             <li><a href="#/academico" id="nav-academico" class="nav-link">Académico</a></li>
             <li><a href="#/files" id="nav-files" class="nav-link">Files</a></li>

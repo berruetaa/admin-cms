@@ -1,6 +1,7 @@
 import { Auth } from "../services/auth.js";
 import { Navbar } from "../components/navbar.js";
 import { Dashboard } from "../modules/dashboard.js";
+import { Homepage } from "../modules/homepage.js";
 import { Blog } from "../modules/blog.js";
 import { Academico } from "../modules/academico.js";
 import { Files } from "../modules/files.js";
@@ -10,6 +11,7 @@ import { ColorfulTitle } from "../components/ColorfulTitle.js";
 
 const routes = {
   "/dashboard": Dashboard,
+  "/homepage": Homepage,
   "/blog": Blog,
   "/academico": Academico,
   "/files": Files,
