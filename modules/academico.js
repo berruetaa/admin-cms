@@ -4,7 +4,6 @@ import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
 
 const DATA_PATH = "academico/data.json";
-const PDF_DIR = "academico/";
 
 export const Academico = {
   data: { categories: [], resources: [] },
@@ -17,7 +16,6 @@ export const Academico = {
         <div class="header-actions">
           <button id="btn-new-category" class="btn btn-secondary">Nueva Categoría</button>
           <button id="btn-new-resource" class="btn btn-primary">Nuevo Recurso</button>
-          <button id="btn-upload-pdf" class="btn btn-secondary">Subir PDF</button>
         </div>
       </div>
       <div id="academico-content">
@@ -27,7 +25,6 @@ export const Academico = {
 
     document.getElementById("btn-new-category").addEventListener("click", () => this.showCategoryModal());
     document.getElementById("btn-new-resource").addEventListener("click", () => this.showResourceModal());
-    document.getElementById("btn-upload-pdf").addEventListener("click", () => this.showUploadModal());
 
     await this.loadData();
   },
@@ -37,8 +34,8 @@ export const Academico = {
 
     try {
       if (REPOS.gists.academico === "YOUR_GIST_ID_HERE") {
-          contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
-          return;
+        contentDiv.innerHTML = `<div class="alert alert-info">Configure el GIST ID en config/repos.js para cargar los datos.</div>`;
+        return;
       }
 
       const gist = await GitHubAPI.getGist(REPOS.gists.academico);
@@ -134,6 +131,7 @@ export const Academico = {
         <form id="cat-form">
           ${Form.renderField({ id: "id", label: "ID (slug)", value: isEdit ? cat.id : '', required: true, type: "text" })}
           ${Form.renderField({ id: "name", label: "Nombre", value: isEdit ? cat.name : '', required: true, type: "text" })}
+          ${Form.renderField({ id: "description", label: "Descripción", value: isEdit && cat.description ? cat.description : '', required: true, type: "text" })}
         </form>
       `,
       `
@@ -147,23 +145,108 @@ export const Academico = {
       const form = overlay.querySelector("#cat-form");
       if (!form.checkValidity()) { form.reportValidity(); return; }
 
-      const formData = Form.getFormData(form, [{id: "id", type: "text"}, {id: "name", type: "text"}]);
+      const formData = Form.getFormData(form, [{ id: "id", type: "text" }, { id: "name", type: "text" }, { id: "description", type: "text" }]);
+      formData.url = `/academico/${formData.id}/`;
 
       if (isEdit) {
         const index = this.data.categories.findIndex(c => c.id === id);
+        // keep old url if exists
+        formData.url = this.data.categories[index].url || formData.url;
         this.data.categories[index] = formData;
+        Modal.close(overlay);
+        this.saveData();
       } else {
-        this.data.categories.push(formData);
+        Modal.close(overlay);
+        this.createCategoryAndSave(formData);
       }
-
-      Modal.close(overlay);
-      this.saveData();
     });
   },
 
+  async createCategoryAndSave(formData) {
+    const loadingModal = Modal.showLoading(`Creando categoría ${formData.id}...`);
+    try {
+      const template = `<!DOCTYPE html>
+<html lang="es" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Académico | Berrueta</title>
+    <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&display=swap" rel="stylesheet" />
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/css/styles.css" />
+    <style>
+      .academic-container { max-width: 800px; margin: 0 auto; padding: 0; text-align: left; width: 100%; }
+      .academic-title { font-size: 3rem; margin-bottom: var(--spacing-md); border-bottom: 2px solid var(--color-accent); display: inline-block; animation: fadeInDown 0.8s ease-out forwards; opacity: 0; transform: translateY(-20px); }
+      .academic-subtitle { font-size: 1.2rem; margin-bottom: var(--spacing-md); color: #555; animation: fadeInUp 0.8s ease-out 0.2s forwards; opacity: 0; transform: translateY(20px); }
+      .academic-list { list-style: none; display: flex; flex-direction: column; gap: var(--spacing-sm); margin-top: var(--spacing-sm); animation: fadeInUp 0.8s ease-out 0.4s forwards; opacity: 0; transform: translateY(20px); }
+      .academic-item { background-color: var(--color-background); border: 1px solid var(--color-border); padding: var(--spacing-sm); border-radius: 8px; transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast); }
+      .academic-item:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: var(--color-accent); }
+      .academic-item-title { font-size: 1.5rem; color: var(--color-accent); margin-bottom: 0.5rem; }
+      .academic-item p { color: #666; font-size: 1rem; }
+      .resource-link { display: block; width: 100%; height: 100%; }
+      .resource-link:hover .academic-item-title { text-decoration: underline; }
+      .back-link { display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: var(--spacing-sm); font-weight: 500; color: #666; animation: fadeInDown 0.8s ease-out forwards; }
+      .back-link:hover { color: var(--color-accent); }
+    </style>
+  </head>
+  <body>
+    <header class="header" id="main-header">
+      <div class="nav-container">
+        <a href="/" class="logo" id="logo-container" aria-label="Inicio"></a>
+        <nav class="nav-menu"></nav>
+      </div>
+    </header>
+    <main class="main-content" style="padding-top: var(--spacing-md); justify-content: flex-start;">
+      <div class="academic-container">
+        <a href="/academico/" class="back-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          Volver a categorías
+        </a>
+        <br>
+        <h1 class="academic-title">${formData.name}</h1>
+        <p class="academic-subtitle">${formData.description}</p>
+        <div id="resources-container" data-category="${formData.id}"></div>
+      </div>
+    </main>
+    <footer class="footer"></footer>
+    <script type="module" src="/src/js/main.js"></script>
+    <script type="module" src="/src/js/academico.js"></script>
+  </body>
+</html>`;
+      const { Base64 } = await import("../utils/base64.js");
+      const base64Content = Base64.encode(template);
+      await GitHubAPI.createFile(REPOS.site, `academico/${formData.id}/index.html`, base64Content, `Crear categoría: ${formData.name}`);
+
+      this.data.categories.push(formData);
+      Modal.close(loadingModal);
+      this.saveData();
+    } catch (e) {
+      Modal.close(loadingModal);
+      Modal.showError(`Error al crear la categoría: ${e.message}`);
+    }
+  },
+
   deleteCategory(id) {
-    Modal.showConfirm(`¿Eliminar la categoría ${id}?`, () => {
+    Modal.showConfirm(`¿Eliminar la categoría "${id}" y su página del sitio?`, async () => {
+      const path = `academico/${id}/index.html`;
+      const loadingModal = Modal.showLoading(`Eliminando categoría ${id}...`);
+      try {
+        // Get SHA of the file so we can delete it
+        const fileData = await GitHubAPI.getFile(REPOS.site, path);
+        await GitHubAPI.deleteFile(REPOS.site, path, `Eliminar categoría: ${id}`, fileData.sha);
+      } catch (e) {
+        // If the file doesn't exist on the repo (e.g. legacy category), just continue
+        if (!e.message.includes('404') && !e.message.includes('Not Found')) {
+          Modal.close(loadingModal);
+          Modal.showError(`Error al eliminar el archivo del sitio: ${e.message}`);
+          return;
+        }
+      }
       this.data.categories = this.data.categories.filter(c => c.id !== id);
+      Modal.close(loadingModal);
       this.saveData();
     });
   },
@@ -174,8 +257,9 @@ export const Academico = {
 
     const catOptions = this.data.categories.map(c => ({ value: c.id, label: c.name }));
     const typeOptions = [
-      { value: "pdf", label: "PDF" },
-      { value: "link", label: "Enlace Externo" }
+      { value: "link", label: "Enlace Externo" },
+      { value: "pdf", label: "Archivo (PDF/Epub)" },
+      { value: "texto", label: "Texto / Artículo" }
     ];
 
     const overlay = Modal.create(
@@ -185,10 +269,20 @@ export const Academico = {
           ${Form.renderField({ id: "title", label: "Título", value: isEdit ? res.title : '', required: true, type: "text" })}
           ${Form.renderField({ id: "category", label: "Categoría", value: isEdit ? res.category : (catOptions.length > 0 ? catOptions[0].value : ''), required: true, type: "select", options: catOptions })}
           ${Form.renderField({ id: "group", label: "Grupo", value: isEdit ? res.group : '', required: true, type: "text" })}
-          ${Form.renderField({ id: "tags", label: "Tags (separados por coma)", value: isEdit ? (res.tags || []).join(', ') : '', type: "text" })}
-          ${Form.renderField({ id: "type", label: "Tipo", value: isEdit ? res.type : 'pdf', required: true, type: "select", options: typeOptions })}
-          ${Form.renderField({ id: "url", label: "URL o Ruta del Archivo", value: isEdit ? res.url : '', required: true, type: "text" })}
-          ${Form.renderField({ id: "description", label: "Descripción", value: isEdit ? res.description : '', type: "textarea", rows: 3 })}
+          ${Form.renderField({ id: "tags", label: "Tags (separados por coma)", value: isEdit && res.tags ? res.tags.join(', ') : '', type: "text" })}
+          ${Form.renderField({ id: "type", label: "Tipo", value: isEdit ? res.type : 'link', required: true, type: "select", options: typeOptions })}
+          
+          <div id="wrapper-url" style="display: block;">
+            ${Form.renderField({ id: "url", label: "URL", value: isEdit ? res.url : '', type: "text" })}
+          </div>
+          <div id="wrapper-file" style="display: none;">
+            ${Form.renderField({ id: "file", label: "Subir Archivo (.pdf, .epub)", type: "file", accept: ".pdf,.epub" })}
+          </div>
+          <div id="wrapper-content" style="display: none;">
+            ${Form.renderField({ id: "content", label: "Contenido del Artículo (Markdown/HTML)", type: "textarea", rows: 10 })}
+          </div>
+
+          ${Form.renderField({ id: "description", label: "Descripción Breve", value: isEdit ? res.description : '', required: true, type: "textarea", rows: 3 })}
         </form>
       `,
       `
@@ -197,31 +291,144 @@ export const Academico = {
       `
     );
 
-    overlay.querySelector("#res-cancel").addEventListener("click", () => Modal.close(overlay));
-    overlay.querySelector("#res-save").addEventListener("click", () => {
-      const form = overlay.querySelector("#res-form");
-      if (!form.checkValidity()) { form.reportValidity(); return; }
+    const typeSelect = overlay.querySelector("#type");
+    const wrapperUrl = overlay.querySelector("#wrapper-url");
+    const wrapperFile = overlay.querySelector("#wrapper-file");
+    const wrapperContent = overlay.querySelector("#wrapper-content");
 
-      const formData = Form.getFormData(form, [
-        {id: "title", type: "text"},
-        {id: "category", type: "text"},
-        {id: "group", type: "text"},
-        {id: "tags", type: "text"},
-        {id: "type", type: "text"},
-        {id: "url", type: "text"},
-        {id: "description", type: "text"}
-      ]);
-
-      // Process tags from string to array
-      formData.tags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(t => t !== "") : [];
+    function updateUI() {
+      const val = typeSelect.value;
+      wrapperUrl.style.display = val === 'link' || isEdit ? 'block' : 'none';
+      wrapperFile.style.display = val === 'pdf' && !isEdit ? 'block' : 'none';
+      wrapperContent.style.display = val === 'texto' && !isEdit ? 'block' : 'none';
 
       if (isEdit) {
-        this.data.resources[index] = formData;
-      } else {
-        this.data.resources.push(formData);
+        overlay.querySelector('label[for="url"]').textContent = "URL del Recurso";
+      }
+    }
+    typeSelect.addEventListener("change", updateUI);
+    updateUI();
+
+    overlay.querySelector("#res-cancel").addEventListener("click", () => Modal.close(overlay));
+    overlay.querySelector("#res-save").addEventListener("click", async () => {
+      const form = overlay.querySelector("#res-form");
+
+      // Select elements
+      const urlInput = form.querySelector("#url");
+      const fileInput = form.querySelector("#file");
+      const contentInput = form.querySelector("#content");
+
+      if (!isEdit && typeSelect.value === 'link' && !urlInput.value.trim()) { alert("Debe ingresar la URL"); return; }
+
+      const titleVal = form.querySelector("#title").value.trim();
+      const typeVal = typeSelect.value;
+      let finalUrl = urlInput.value.trim();
+
+      const baseData = {
+        title: titleVal,
+        category: form.querySelector("#category").value,
+        group: form.querySelector("#group").value.trim(),
+        type: typeVal,
+        description: form.querySelector("#description").value.trim()
+      };
+
+      const tagsStr = form.querySelector("#tags").value;
+      baseData.tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(t => t !== "") : [];
+
+      if (!baseData.title || !baseData.category || !baseData.group || !baseData.description) {
+        alert("Por favor complete todos los campos obligatorios");
+        return;
       }
 
+      if (!isEdit) {
+        if (typeVal === 'pdf') {
+          if (fileInput.files.length === 0) {
+            alert("Debe seleccionar un archivo PDF/Epub");
+            return;
+          }
+          const file = fileInput.files[0];
+          const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const path = `academico/${cleanName}`;
+
+          const loadingModal = Modal.showLoading(`Subiendo archivo ${file.name}...`);
+          try {
+            const { Base64 } = await import("../utils/base64.js");
+            const base64Content = await Base64.encodeFile(file);
+            await GitHubAPI.createFile(REPOS.site, path, base64Content, `Upload PDF: ${file.name}`);
+            Modal.close(loadingModal);
+            finalUrl = `/${path}`;
+          } catch (err) {
+            Modal.close(loadingModal);
+            Modal.showError(`Error al subir: ${err.message}`);
+            return;
+          }
+        } else if (typeVal === 'texto') {
+          const contentVal = contentInput.value.trim();
+          if (!contentVal) {
+            alert("Debe escribir el contenido del recurso de texto"); return;
+          }
+          const slug = baseData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+          const path = `academico/recursos/${slug}.html`;
+
+          const template = `<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${baseData.title} | Académico</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/css/styles.css">
+  <style>
+    .article-container { max-width: 800px; margin: 0 auto; padding: 2rem 1rem; }
+    .article-title { font-size: 2.5rem; color: var(--color-accent); margin-bottom: 0.5rem; }
+    .article-meta { font-size: 0.9rem; color: #666; margin-bottom: 2rem; border-bottom: 1px solid var(--color-border); padding-bottom: 1rem; }
+    .article-content { font-size: 1.1rem; line-height: 1.8; color: var(--color-text); }
+    .article-content p { margin-bottom: 1.5rem; }
+    .back-link { display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem; font-weight: 500; color: #666; }
+    .back-link:hover { color: var(--color-accent); }
+  </style>
+</head>
+<body>
+  <header class="header" id="main-header"><div class="nav-container"><a href="/" class="logo" id="logo-container" aria-label="Inicio"></a><nav class="nav-menu"></nav></div></header>
+  <main class="main-content">
+    <article class="article-container">
+      <a href="/academico/" class="back-link">&larr; Volver a Académico</a>
+      <h1 class="article-title">${baseData.title}</h1>
+      <div class="article-meta">Recurso de ${baseData.category} | ${baseData.group}</div>
+      <div class="article-content">
+        ${contentVal.replace(/\\n/g, '<br>')}
+      </div>
+    </article>
+  </main>
+  <footer class="footer"></footer>
+  <script type="module" src="/src/js/main.js"></script>
+</body>
+</html>`;
+
+          const loadingModal = Modal.showLoading(`Creando artículo ${baseData.title}...`);
+          try {
+            const { Base64 } = await import("../utils/base64.js");
+            const base64Content = Base64.encode(template);
+            await GitHubAPI.createFile(REPOS.site, path, base64Content, `Crear artículo: ${baseData.title}`);
+            Modal.close(loadingModal);
+            finalUrl = `/${path}`;
+          } catch (err) {
+            Modal.close(loadingModal);
+            Modal.showError(`Error al crear artículo: ${err.message}`);
+            return;
+          }
+        }
+      }
+
+      baseData.url = finalUrl;
       Modal.close(overlay);
+
+      if (isEdit) {
+        this.data.resources[index] = baseData;
+      } else {
+        this.data.resources.push(baseData);
+      }
       this.saveData();
     });
   },
@@ -231,55 +438,6 @@ export const Academico = {
     Modal.showConfirm(`¿Eliminar el recurso ${res.title}?`, () => {
       this.data.resources.splice(index, 1);
       this.saveData();
-    });
-  },
-
-  showUploadModal() {
-    const overlay = Modal.create(
-      "Subir PDF",
-      `
-        <form id="upload-form">
-          ${Form.renderField({ id: "file", label: "Archivo PDF", required: true, type: "file", accept: ".pdf" })}
-          ${Form.renderField({ id: "filename", label: "Nombre de archivo (opcional)", type: "text" })}
-        </form>
-      `,
-      `
-        <button class="btn btn-secondary" id="upload-cancel">Cancelar</button>
-        <button class="btn btn-primary" id="upload-save">Subir</button>
-      `
-    );
-
-    overlay.querySelector("#upload-cancel").addEventListener("click", () => Modal.close(overlay));
-
-    overlay.querySelector("#upload-save").addEventListener("click", async () => {
-      const form = overlay.querySelector("#upload-form");
-      const fileInput = form.querySelector("#file");
-
-      if (fileInput.files.length === 0) {
-        alert("Debe seleccionar un archivo");
-        return;
-      }
-
-      const file = fileInput.files[0];
-      const customName = form.querySelector("#filename").value.trim();
-      const filename = customName || file.name;
-      const path = `${PDF_DIR}${filename}`;
-
-      const loadingModal = Modal.showLoading(`Subiendo ${filename}...`);
-      Modal.close(overlay);
-
-      try {
-        const { Base64 } = await import("../utils/base64.js");
-        const base64Content = await Base64.encodeFile(file);
-
-        await GitHubAPI.createFile(REPOS.site, path, base64Content, `Upload PDF: ${filename}`);
-
-        Modal.close(loadingModal);
-        Modal.showError("Archivo subido correctamente. Ahora puede crear un recurso para él."); // using showError as alert for simplicity
-      } catch (error) {
-        Modal.close(loadingModal);
-        Modal.showError(`Error al subir: ${error.message}`);
-      }
     });
   }
 };
