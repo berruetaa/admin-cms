@@ -2,6 +2,13 @@ import { GitHubAPI } from "../services/github-api.js";
 import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif'];
+
+function isImage(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return IMAGE_EXTS.includes(ext);
+}
+
 export const Files = {
   currentPath: "",
 
@@ -16,6 +23,12 @@ export const Files = {
 
       <div class="file-browser">
         <div class="breadcrumbs" id="file-breadcrumbs">/</div>
+
+        <!-- Drag & Drop zone -->
+        <div id="drop-zone" class="drop-zone" aria-label="Arrastrar archivos aquí">
+          <span class="drop-zone-label">📂 Arrastrá archivos aquí para subirlos</span>
+        </div>
+
         <div id="file-list" class="file-list">
           <div class="loading-spinner"></div> Cargando directorio...
         </div>
@@ -23,20 +36,59 @@ export const Files = {
     `;
 
     document.getElementById("btn-upload-file").addEventListener("click", () => this.showUploadModal());
-
+    this._initDropZone();
     await this.loadDirectory("");
+  },
+
+  _initDropZone() {
+    const zone = document.getElementById("drop-zone");
+    if (!zone) return;
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      zone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        zone.classList.add('drop-zone--active');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      zone.addEventListener(evt, () => zone.classList.remove('drop-zone--active'));
+    });
+
+    zone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length) return;
+      await this._uploadFiles(files);
+    });
+  },
+
+  async _uploadFiles(files) {
+    const { Base64 } = await import("../utils/base64.js");
+
+    for (const file of files) {
+      const targetPath = this.currentPath ? `${this.currentPath}/${file.name}` : file.name;
+      const loadingModal = Modal.showLoading(`Subiendo ${file.name}...`);
+      try {
+        const base64Content = await Base64.encodeFile(file);
+        await GitHubAPI.createFile(REPOS.site, targetPath, base64Content, `Upload file: ${targetPath}`);
+        Modal.close(loadingModal);
+      } catch (error) {
+        Modal.close(loadingModal);
+        Modal.showError(`Error al subir ${file.name}: ${error.message}`);
+      }
+    }
+    this.loadDirectory(this.currentPath);
   },
 
   async loadDirectory(path) {
     const listDiv = document.getElementById("file-list");
     this.currentPath = path;
-
     this.updateBreadcrumbs();
 
     try {
       const files = await GitHubAPI.getDirectory(REPOS.site, path);
 
-      // Sort directories first
       files.sort((a, b) => {
         if (a.type === b.type) return a.name.localeCompare(b.name);
         return a.type === "dir" ? -1 : 1;
@@ -57,7 +109,7 @@ export const Files = {
         const parentPath = path.substring(0, path.lastIndexOf("/")) || "";
         html += `
           <tr class="dir-row" data-path="${parentPath}">
-            <td><span class="icon">📁</span> ..</td>
+            <td><span class="icon">📁</span> <a href="javascript:void(0)" class="file-link">..</a></td>
             <td>-</td>
             <td></td>
           </tr>
@@ -66,15 +118,29 @@ export const Files = {
 
       files.forEach(file => {
         const isDir = file.type === "dir";
-        const icon = isDir ? "📁" : "📄";
+        const img = !isDir && isImage(file.name);
+        const icon = isDir ? "📁" : (img ? "🖼️" : "📄");
         const size = isDir ? "-" : `${(file.size / 1024).toFixed(1)} KB`;
+
+        const preview = img
+          ? `<img src="${file.download_url}" alt="${file.name}" class="file-thumb" loading="lazy">`
+          : '';
+
+        const copyBtn = !isDir
+          ? `<button class="btn btn-sm btn-outline btn-copy-url" data-url="/${file.path}" title="Copiar URL relativa">📋</button>`
+          : '';
 
         html += `
           <tr class="${isDir ? 'dir-row' : 'file-row'}" data-path="${file.path}">
-            <td><span class="icon">${icon}</span> <a href="javascript:void(0)" class="file-link">${file.name}</a></td>
+            <td>
+              ${preview}
+              <span class="icon">${icon}</span>
+              <a href="javascript:void(0)" class="file-link">${file.name}</a>
+            </td>
             <td>${size}</td>
             <td class="actions">
               ${!isDir ? `<a href="${file.download_url}" target="_blank" class="btn btn-sm btn-secondary">Ver</a>` : ''}
+              ${copyBtn}
               <button class="btn btn-sm btn-danger btn-delete-file" data-path="${file.path}" data-sha="${file.sha}" data-name="${file.name}">Borrar</button>
             </td>
           </tr>
@@ -84,7 +150,7 @@ export const Files = {
       html += "</tbody></table>";
       listDiv.innerHTML = html;
 
-      // Bind directory click events
+      // Navigate into directory
       listDiv.querySelectorAll(".dir-row .file-link").forEach(link => {
         link.addEventListener("click", (e) => {
           const rowPath = e.target.closest("tr").dataset.path;
@@ -92,11 +158,33 @@ export const Files = {
         });
       });
 
-      // Bind delete events
+      // Also make clicking a dir-row's icon navigate
+      listDiv.querySelectorAll(".dir-row").forEach(row => {
+        row.addEventListener("click", (e) => {
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+          this.loadDirectory(row.dataset.path);
+        });
+      });
+
+      // Delete
       listDiv.querySelectorAll(".btn-delete-file").forEach(btn => {
         btn.addEventListener("click", (e) => {
+          e.stopPropagation();
           const { path, sha, name } = e.target.dataset;
           this.deleteFile(path, sha, name);
+        });
+      });
+
+      // Copy URL
+      listDiv.querySelectorAll(".btn-copy-url").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const url = e.target.dataset.url;
+          navigator.clipboard.writeText(url).then(() => {
+            const orig = e.target.textContent;
+            e.target.textContent = '✅';
+            setTimeout(() => { e.target.textContent = orig; }, 1500);
+          });
         });
       });
 
@@ -107,6 +195,7 @@ export const Files = {
 
   updateBreadcrumbs() {
     const breadcrumbsDiv = document.getElementById("file-breadcrumbs");
+    if (!breadcrumbsDiv) return;
 
     if (!this.currentPath) {
       breadcrumbsDiv.innerHTML = `<span class="breadcrumb-item active">/ (raíz)</span>`;
@@ -134,7 +223,7 @@ export const Files = {
   },
 
   deleteFile(path, sha, name) {
-    Modal.showConfirm(`¿Estás seguro de que deseas eliminar ${name}? Esta acción es irreversible.`, async () => {
+    Modal.showConfirm(`¿Eliminar ${name}? Esta acción es irreversible.`, async () => {
       const loadingModal = Modal.showLoading(`Eliminando ${name}...`);
       try {
         await GitHubAPI.deleteFile(REPOS.site, path, `Delete file: ${path}`, sha);
@@ -157,8 +246,8 @@ export const Files = {
             <input type="text" class="form-control" disabled value="${this.currentPath || '/'}" />
           </div>
           <div class="form-group">
-            <label for="upload-file-input">Seleccionar Archivo <span class="text-danger">*</span></label>
-            <input type="file" id="upload-file-input" class="form-control-file" required />
+            <label for="upload-file-input">Seleccionar Archivo(s) <span class="text-danger">*</span></label>
+            <input type="file" id="upload-file-input" class="form-control-file" multiple required />
           </div>
         </form>
       `,
@@ -171,32 +260,10 @@ export const Files = {
     overlay.querySelector("#upload-file-cancel").addEventListener("click", () => Modal.close(overlay));
 
     overlay.querySelector("#upload-file-save").addEventListener("click", async () => {
-      const form = overlay.querySelector("#upload-file-form");
-      const fileInput = form.querySelector("#upload-file-input");
-
-      if (!fileInput.files.length) {
-        alert("Debe seleccionar un archivo");
-        return;
-      }
-
-      const file = fileInput.files[0];
-      const targetPath = this.currentPath ? `${this.currentPath}/${file.name}` : file.name;
-
-      const loadingModal = Modal.showLoading(`Subiendo ${file.name}...`);
+      const fileInput = overlay.querySelector("#upload-file-input");
+      if (!fileInput.files.length) { alert("Debe seleccionar al menos un archivo"); return; }
       Modal.close(overlay);
-
-      try {
-        const { Base64 } = await import("../utils/base64.js");
-        const base64Content = await Base64.encodeFile(file);
-
-        await GitHubAPI.createFile(REPOS.site, targetPath, base64Content, `Upload file: ${targetPath}`);
-
-        Modal.close(loadingModal);
-        this.loadDirectory(this.currentPath);
-      } catch (error) {
-        Modal.close(loadingModal);
-        Modal.showError(`Error al subir: ${error.message}`);
-      }
+      await this._uploadFiles(Array.from(fileInput.files));
     });
   }
 };

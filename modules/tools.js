@@ -13,7 +13,11 @@ export const Tools = {
     container.innerHTML = `
       <div class="module-header">
         <h2>Gestión de Herramientas</h2>
-        <button id="btn-new-tool" class="btn btn-primary">Nueva Herramienta</button>
+        <div class="header-actions">
+          <button id="btn-export-tools" class="btn btn-outline">Exportar JSON</button>
+          <button id="btn-import-tools" class="btn btn-outline">Importar JSON</button>
+          <button id="btn-new-tool" class="btn btn-primary">Nueva Herramienta</button>
+        </div>
       </div>
       <div id="tools-content">
         <div class="loading-spinner"></div> Cargando herramientas...
@@ -21,6 +25,8 @@ export const Tools = {
     `;
 
     document.getElementById("btn-new-tool").addEventListener("click", () => this.showToolModal());
+    document.getElementById("btn-export-tools").addEventListener("click", () => this.exportData());
+    document.getElementById("btn-import-tools").addEventListener("click", () => this.importData());
 
     await this.loadData();
   },
@@ -71,6 +77,7 @@ export const Tools = {
           <td><a href="${tool.url}" target="_blank">${tool.url}</a></td>
           <td class="actions">
             <button class="btn btn-sm btn-secondary btn-edit-tool" data-index="${index}">Editar</button>
+            <button class="btn btn-sm btn-warning btn-duplicate-tool" data-index="${index}">Duplicar</button>
             <button class="btn btn-sm btn-danger btn-delete-tool" data-index="${index}">Borrar</button>
           </td>
         </tr>
@@ -81,6 +88,7 @@ export const Tools = {
     container.innerHTML = html;
 
     container.querySelectorAll('.btn-edit-tool').forEach(btn => btn.addEventListener('click', (e) => this.showToolModal(e.target.dataset.index)));
+    container.querySelectorAll('.btn-duplicate-tool').forEach(btn => btn.addEventListener('click', (e) => this.duplicateTool(e.target.dataset.index)));
     container.querySelectorAll('.btn-delete-tool').forEach(btn => btn.addEventListener('click', (e) => this.deleteTool(e.target.dataset.index)));
   },
 
@@ -153,5 +161,45 @@ export const Tools = {
       this.data.splice(index, 1);
       this.saveData(`Delete tool: ${tool.name}`);
     });
+  },
+
+  duplicateTool(index) {
+    const tool = this.data[index];
+    const copy = { ...tool, id: tool.id + '-copia', name: tool.name + ' (copia)' };
+    this.data.splice(Number(index) + 1, 0, copy);
+    this.saveData(`Duplicate tool: ${tool.name}`);
+  },
+
+  exportData() {
+    const json = JSON.stringify(this.data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tools.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) throw new Error('El JSON debe ser un array de herramientas.');
+        Modal.showConfirm(`¿Reemplazar las ${this.data.length} herramientas actuales con las ${parsed.length} del archivo?`, async () => {
+          this.data = parsed;
+          await this.saveData('Import tools.json from local backup');
+        });
+      } catch (err) {
+        Modal.showError(`JSON inválido: ${err.message}`);
+      }
+    };
+    input.click();
   }
 };

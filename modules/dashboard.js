@@ -4,69 +4,58 @@ import { Modal } from "../components/modal.js";
 
 export const Dashboard = {
   async render(container) {
-    const loadingModal = Modal.showLoading('Cargando datos del Dashboard...');
+    const loadingModal = Modal.showLoading('Cargando Dashboard...');
 
     try {
-      // Fetch repository information concurrently
-      const [blogInfo, siteInfo, blogCommits, siteCommits] = await Promise.all([
+      const [blogInfo, siteInfo, blogCommits, siteCommits, blogDir] = await Promise.all([
         GitHubAPI.getRepoInfo(REPOS.blog).catch(() => null),
         GitHubAPI.getRepoInfo(REPOS.site).catch(() => null),
-        GitHubAPI.getLatestCommit(REPOS.blog).catch(() => []),
-        GitHubAPI.getLatestCommit(REPOS.site).catch(() => [])
+        GitHubAPI.getCommits(REPOS.blog, null, 8).catch(() => []),
+        GitHubAPI.getCommits(REPOS.site, null, 8).catch(() => []),
+        GitHubAPI.getDirectory(REPOS.blog, 'src/data/blog').catch(() => [])
       ]);
 
       Modal.close(loadingModal);
 
-      const renderRepoCard = (title, info, commits, type) => {
-        if (!info) {
-          return `<div class="card error">
-            <h3>${title}</h3>
-            <p>Error al cargar el repositorio. Verifique los permisos del token.</p>
-          </div>`;
-        }
+      // ── Stats ─────────────────────────────────────────────────────────────
+      const totalPosts = blogDir.filter(f => f.name.endsWith('.md')).length;
+      const siteKB    = siteInfo ? (siteInfo.size).toFixed(0) : '?';
+      const blogKB    = blogInfo ? (blogInfo.size).toFixed(0) : '?';
 
-        const lastCommit = commits && commits.length > 0 ? commits[0] : null;
+      const statsHTML = `
+        <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:2rem;">
+          ${this._statCard('📝', 'Posts en Blog', totalPosts)}
+          ${this._statCard('📦', 'Tamaño Blog', `${blogKB} KB`)}
+          ${this._statCard('🌐', 'Tamaño Sitio', `${siteKB} KB`)}
+          ${this._statCard('🔗', 'Commits Blog', blogCommits.length)}
+          ${this._statCard('📡', 'Commits Sitio', siteCommits.length)}
+        </div>
+      `;
 
-        return `
-          <div class="card">
-            <h3><a href="${info.html_url}" target="_blank">${info.name}</a></h3>
-            <p class="repo-desc">${info.description || 'Sin descripción'}</p>
+      // ── Repo cards ────────────────────────────────────────────────────────
+      const repoHTML = `
+        <div class="dashboard-grid" style="margin-bottom:2rem;">
+          ${this._repoCard('Blog', blogInfo, REPOS.blog, 'blog')}
+          ${this._repoCard('Sitio Principal', siteInfo, REPOS.site, 'academico')}
+        </div>
+      `;
 
-            <ul class="repo-stats">
-              <li><strong>Rama:</strong> ${type === 'blog' ? REPOS.blog.branch : REPOS.site.branch}</li>
-              <li><strong>Tamaño:</strong> ${(info.size / 1024).toFixed(2)} MB</li>
-              <li><strong>Privado:</strong> ${info.private ? 'Sí' : 'No'}</li>
-              <li><strong>Última Actualización:</strong> ${new Date(info.updated_at).toLocaleString()}</li>
-            </ul>
-
-            <div class="commit-info">
-              <h4>Último Commit</h4>
-              ${lastCommit ? `
-                <div class="commit-message">${lastCommit.commit.message}</div>
-                <div class="commit-meta">
-                  Por <strong>${lastCommit.commit.author.name}</strong> el ${new Date(lastCommit.commit.author.date).toLocaleString()}
-                </div>
-                <a href="${lastCommit.html_url}" target="_blank" class="commit-link">Ver en GitHub</a>
-              ` : '<p>No hay commits recientes</p>'}
-            </div>
-
-            <div class="card-actions">
-              <a href="#/${type === 'blog' ? 'blog' : 'academico'}" class="btn btn-primary">Gestionar Contenido</a>
-            </div>
-          </div>
-        `;
-      };
+      // ── Commit history ────────────────────────────────────────────────────
+      const historyHTML = `
+        <div class="dashboard-grid">
+          ${this._commitsCard('Historial Blog', blogCommits, REPOS.blog)}
+          ${this._commitsCard('Historial Sitio', siteCommits, REPOS.site)}
+        </div>
+      `;
 
       container.innerHTML = `
         <div class="module-header">
           <h2>Dashboard</h2>
           <p>Visión general de los repositorios conectados</p>
         </div>
-
-        <div class="dashboard-grid">
-          ${renderRepoCard('Blog', blogInfo, blogCommits, 'blog')}
-          ${renderRepoCard('Sitio Principal', siteInfo, siteCommits, 'site')}
-        </div>
+        ${statsHTML}
+        ${repoHTML}
+        ${historyHTML}
       `;
 
     } catch (error) {
@@ -74,5 +63,63 @@ export const Dashboard = {
       Modal.showError(error.message);
       container.innerHTML = `<div class="error-state"><h2>Error cargando dashboard</h2><p>${error.message}</p></div>`;
     }
+  },
+
+  _statCard(icon, label, value) {
+    return `
+      <div class="card" style="text-align:center;padding:1rem;">
+        <div style="font-size:1.8rem;">${icon}</div>
+        <div style="font-size:1.6rem;font-weight:700;margin:.25rem 0;">${value}</div>
+        <div style="font-size:.8rem;color:var(--text-muted,#888);">${label}</div>
+      </div>
+    `;
+  },
+
+  _repoCard(title, info, repoConfig, type) {
+    if (!info) {
+      return `<div class="card error"><h3>${title}</h3><p>Error al cargar el repositorio.</p></div>`;
+    }
+    return `
+      <div class="card">
+        <h3><a href="${info.html_url}" target="_blank">${info.name}</a></h3>
+        <p class="repo-desc">${info.description || 'Sin descripción'}</p>
+        <ul class="repo-stats">
+          <li><strong>Rama:</strong> ${repoConfig.branch}</li>
+          <li><strong>Tamaño:</strong> ${(info.size / 1024).toFixed(2)} MB</li>
+          <li><strong>Privado:</strong> ${info.private ? 'Sí' : 'No'}</li>
+          <li><strong>Actualizado:</strong> ${new Date(info.updated_at).toLocaleString()}</li>
+        </ul>
+        <div class="card-actions">
+          <a href="#/${type}" class="btn btn-primary">Gestionar Contenido</a>
+        </div>
+      </div>
+    `;
+  },
+
+  _commitsCard(title, commits, repoConfig) {
+    if (!commits || commits.length === 0) {
+      return `<div class="card"><h4>${title}</h4><p>Sin commits recientes.</p></div>`;
+    }
+    const rows = commits.map(c => `
+      <tr>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <a href="${c.html_url}" target="_blank" title="${c.commit.message}">${c.commit.message.split('\n')[0]}</a>
+        </td>
+        <td style="font-size:.8rem;color:var(--text-muted,#888);white-space:nowrap;">
+          ${new Date(c.commit.author.date).toLocaleDateString()}
+        </td>
+        <td style="font-size:.8rem;">${c.commit.author.name}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="card">
+        <h4 style="margin-bottom:.75rem;">${title}</h4>
+        <table class="table" style="font-size:.85rem;">
+          <thead><tr><th>Mensaje</th><th>Fecha</th><th>Autor</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
   }
 };

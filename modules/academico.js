@@ -2,6 +2,9 @@ import { GitHubAPI } from "../services/github-api.js";
 import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
+import { Validators } from "../utils/validators.js";
+import { SearchDataStore } from "../components/navbar.js";
+import { Sitemap } from "../utils/sitemap.js";
 
 const DATA_PATH = "academico/data.json";
 
@@ -14,6 +17,8 @@ export const Academico = {
       <div class="module-header">
         <h2>Gestión Académica</h2>
         <div class="header-actions">
+          <button id="btn-export-acad" class="btn btn-outline">Exportar JSON</button>
+          <button id="btn-import-acad" class="btn btn-outline">Importar JSON</button>
           <button id="btn-new-category" class="btn btn-secondary">Nueva Categoría</button>
           <button id="btn-new-resource" class="btn btn-primary">Nuevo Recurso</button>
         </div>
@@ -25,6 +30,8 @@ export const Academico = {
 
     document.getElementById("btn-new-category").addEventListener("click", () => this.showCategoryModal());
     document.getElementById("btn-new-resource").addEventListener("click", () => this.showResourceModal());
+    document.getElementById("btn-export-acad").addEventListener("click", () => this.exportData());
+    document.getElementById("btn-import-acad").addEventListener("click", () => this.importData());
 
     await this.loadData();
   },
@@ -44,6 +51,8 @@ export const Academico = {
       if (!file) throw new Error("data.json no encontrado en el Gist");
 
       this.data = JSON.parse(file.content);
+      // Feed search store
+      SearchDataStore.academico = this.data;
       this.renderContent(contentDiv);
     } catch (error) {
       contentDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
@@ -74,19 +83,25 @@ export const Academico = {
     html += `</tbody></table>
       <h3 style="margin-top: 2rem;">Recursos</h3>
       <table class="table">
-        <thead><tr><th>Título</th><th>Categoría</th><th>Grupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Orden</th><th>Título</th><th>Categoría</th><th>Grupo</th><th>Tipo</th><th>Acciones</th></tr></thead>
         <tbody>
     `;
 
+    const total = this.data.resources.length;
     this.data.resources.forEach((res, index) => {
       html += `
         <tr>
+          <td class="actions" style="white-space:nowrap;">
+            <button class="btn btn-sm btn-outline btn-move-up" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Subir">▲</button>
+            <button class="btn btn-sm btn-outline btn-move-down" data-index="${index}" ${index === total - 1 ? 'disabled' : ''} title="Bajar">▼</button>
+          </td>
           <td>${res.title}</td>
           <td>${res.category}</td>
           <td>${res.group || '-'}</td>
           <td>${res.type}</td>
           <td class="actions">
             <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${index}">Editar</button>
+            <button class="btn btn-sm btn-warning btn-duplicate-res" data-index="${index}">Duplicar</button>
             <button class="btn btn-sm btn-danger btn-delete-res" data-index="${index}">Borrar</button>
           </td>
         </tr>
@@ -101,7 +116,10 @@ export const Academico = {
     container.querySelectorAll('.btn-delete-cat').forEach(btn => btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id)));
 
     container.querySelectorAll('.btn-edit-res').forEach(btn => btn.addEventListener('click', (e) => this.showResourceModal(e.target.dataset.index)));
+    container.querySelectorAll('.btn-duplicate-res').forEach(btn => btn.addEventListener('click', (e) => this.duplicateResource(e.target.dataset.index)));
     container.querySelectorAll('.btn-delete-res').forEach(btn => btn.addEventListener('click', (e) => this.deleteResource(e.target.dataset.index)));
+    container.querySelectorAll('.btn-move-up').forEach(btn => btn.addEventListener('click', (e) => this.moveResource(parseInt(e.target.dataset.index), -1)));
+    container.querySelectorAll('.btn-move-down').forEach(btn => btn.addEventListener('click', (e) => this.moveResource(parseInt(e.target.dataset.index), 1)));
   },
 
   async saveData() {
@@ -156,6 +174,11 @@ export const Academico = {
         Modal.close(overlay);
         this.saveData();
       } else {
+        // Validate unique ID
+        if (!Validators.isCategoryIdUnique(formData.id, this.data.categories)) {
+          Modal.showError(`Ya existe una categoría con el ID "${formData.id}". Elegí un ID diferente.`);
+          return;
+        }
         Modal.close(overlay);
         this.createCategoryAndSave(formData);
       }
@@ -223,6 +246,7 @@ export const Academico = {
       this.data.categories.push(formData);
       Modal.close(loadingModal);
       this.saveData();
+      Sitemap.update(this.data.categories);
     } catch (e) {
       Modal.close(loadingModal);
       Modal.showError(`Error al crear la categoría: ${e.message}`);
@@ -248,6 +272,7 @@ export const Academico = {
       this.data.categories = this.data.categories.filter(c => c.id !== id);
       Modal.close(loadingModal);
       this.saveData();
+      Sitemap.update(this.data.categories);
     });
   },
 
@@ -439,5 +464,55 @@ export const Academico = {
       this.data.resources.splice(index, 1);
       this.saveData();
     });
+  },
+
+  duplicateResource(index) {
+    const res = this.data.resources[index];
+    const copy = { ...res, title: res.title + ' (copia)' };
+    this.data.resources.splice(index + 1, 0, copy);
+    this.saveData();
+  },
+
+  moveResource(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.data.resources.length) return;
+    const resources = this.data.resources;
+    [resources[index], resources[newIndex]] = [resources[newIndex], resources[index]];
+    this.saveData();
+  },
+
+  exportData() {
+    const json = JSON.stringify(this.data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed.categories || !parsed.resources) throw new Error('El JSON debe tener "categories" y "resources".');
+        const cats = parsed.categories.length;
+        const res = parsed.resources.length;
+        Modal.showConfirm(`¿Reemplazar los datos actuales con ${cats} categorías y ${res} recursos del archivo?`, async () => {
+          this.data = parsed;
+          await this.saveData();
+        });
+      } catch (err) {
+        Modal.showError(`JSON inválido: ${err.message}`);
+      }
+    };
+    input.click();
   }
 };

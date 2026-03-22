@@ -195,5 +195,19 @@ export const GitHubAPI = {
       method: "PATCH",
       body: JSON.stringify({ files })
     });
+  },
+
+  /**
+   * Get commits list for a repo
+   * @param {Object} repoConfig { owner, repo, branch }
+   * @param {string|null} path  Optional file path filter
+   * @param {number} count  Max number of commits (default 10)
+   */
+  async getCommits(repoConfig, path = null, count = 10) {
+    const { owner, repo, branch } = repoConfig;
+    let endpoint = `/repos/${owner}/${repo}/commits?sha=${branch}&per_page=${count}`;
+    if (path) endpoint += `&path=${encodeURIComponent(path)}`;
+    return fetchGitHub(endpoint);
   }
 };
+
