@@ -41,6 +41,10 @@ async function fetchGitHub(endpoint, options = {}) {
   return response.json();
 }
 
+function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
 export const GitHubAPI = {
   /**
    * Get a file from a repository
@@ -50,12 +54,17 @@ export const GitHubAPI = {
    */
   async getFile(repoConfig, path) {
     const { owner, repo, branch } = repoConfig;
-    const endpoint = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    const endpoint = `/repos/${owner}/${repo}/contents/${encodePath(path)}?ref=${branch}`;
     const data = await fetchGitHub(endpoint);
 
-    // Decode content if it exists
+    // Decode content if it exists (only if it's likely a text file)
     if (data.content && data.encoding === "base64") {
-      data.decodedContent = Base64.decode(data.content);
+      try {
+        data.decodedContent = Base64.decode(data.content.replace(/\s/g, ""));
+      } catch (e) {
+        // Binary data (like MIDI) will throw URI malformed, skip text decoding
+        data.decodedContent = null;
+      }
     }
 
     return data;
@@ -69,7 +78,7 @@ export const GitHubAPI = {
    */
   async getDirectory(repoConfig, path) {
     const { owner, repo, branch } = repoConfig;
-    const endpoint = `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    const endpoint = `/repos/${owner}/${repo}/contents/${encodePath(path)}?ref=${branch}`;
     return fetchGitHub(endpoint);
   },
 
@@ -83,7 +92,7 @@ export const GitHubAPI = {
    */
   async createFile(repoConfig, path, content, message) {
     const { owner, repo, branch } = repoConfig;
-    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+    const endpoint = `/repos/${owner}/${repo}/contents/${encodePath(path)}`;
 
     const isBase64 = content.match(/^[A-Za-z0-9+/]+={0,2}$/) && (content.length % 4 === 0);
     const encodedContent = isBase64 ? content : Base64.encode(content);
@@ -109,7 +118,7 @@ export const GitHubAPI = {
    */
   async updateFile(repoConfig, path, content, message, sha) {
     const { owner, repo, branch } = repoConfig;
-    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+    const endpoint = `/repos/${owner}/${repo}/contents/${encodePath(path)}`;
 
     const isBase64 = content.match(/^[A-Za-z0-9+/]+={0,2}$/) && (content.length % 4 === 0) && content.length > 0;
     const encodedContent = isBase64 ? content : Base64.encode(content);
@@ -135,7 +144,7 @@ export const GitHubAPI = {
    */
   async deleteFile(repoConfig, path, message, sha) {
     const { owner, repo, branch } = repoConfig;
-    const endpoint = `/repos/${owner}/${repo}/contents/${path}`;
+    const endpoint = `/repos/${owner}/${repo}/contents/${encodePath(path)}`;
 
     return fetchGitHub(endpoint, {
       method: "DELETE",

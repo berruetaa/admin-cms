@@ -70,6 +70,27 @@ export const Modal = {
       `<button class="btn btn-primary" id="error-ok">Entendido</button>`
     );
     overlay.querySelector('#error-ok').addEventListener('click', () => this.close(overlay));
+    return overlay;
+  },
+
+  showInfo(title, message) {
+    const overlay = this.create(
+      title,
+      `<p>${message}</p>`,
+      `<button class="btn btn-primary" id="info-ok">Entendido</button>`
+    );
+    overlay.querySelector('#info-ok').addEventListener('click', () => this.close(overlay));
+    return overlay;
+  },
+
+  showSuccess(message) {
+    const overlay = this.create(
+      'Éxito',
+      `<p class="text-success" style="font-weight: 500;">${message}</p>`,
+      `<button class="btn btn-primary" id="success-ok">Aceptar</button>`
+    );
+    overlay.querySelector('#success-ok').addEventListener('click', () => this.close(overlay));
+    return overlay;
   },
 
   showPreview(title, html) {
