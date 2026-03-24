@@ -25,7 +25,13 @@ test.describe('Admin CMS Functionality', () => {
 
     // Mock the repo info calls that happen immediately after login/redirect to dashboard
     await page.route('https://api.github.com/repos/**', async (route) => {
-      await route.fulfill({ json: { name: 'mock-repo', size: 100, updated_at: new Date().toISOString() } });
+      if (route.request().url().includes('commits')) {
+        await route.fulfill({ json: [] });
+      } else if (route.request().url().includes('contents')) {
+        await route.fulfill({ json: [] });
+      } else {
+        await route.fulfill({ json: { name: 'mock-repo', size: 100, updated_at: new Date().toISOString() } });
+      }
     });
 
     await page.click('button[type="submit"]');
@@ -112,9 +118,13 @@ test.describe('Admin CMS Functionality', () => {
     await page.fill('#author', 'Test Author');
     await page.fill('#description', 'Test Description');
 
-    // Toggle to textarea for easier input
-    await page.click('#toggle-editor-btn');
-    await page.fill('#editor-textarea', 'Test Content');
+    // Set EasyMDE value
+    await page.evaluate(() => {
+      // Find the EasyMDE instance (it's often bound to the element or accessible globally in our setup)
+      // Since it's hard to access the local variable, we can simulate typing in CodeMirror
+      const cm = document.querySelector('.CodeMirror').CodeMirror;
+      cm.setValue('Test Content');
+    });
 
     await page.click('#editor-save');
 
