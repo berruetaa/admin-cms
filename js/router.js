@@ -8,7 +8,6 @@ import { Files } from "../modules/files.js";
 import { Tools } from "../modules/tools.js";
 import { Juegos } from "../modules/juegos.js";
 import { System } from "../modules/system.js";
-import { Audio } from "../modules/audio.js";
 import { ColorfulTitle } from "../components/ColorfulTitle.js";
 
 const routes = {
@@ -19,8 +18,7 @@ const routes = {
   "/files": Files,
   "/tools": Tools,
   "/juegos": Juegos,
-  "/system": System,
-  "/audio": Audio
+  "/system": System
 };
 
 export const Router = {

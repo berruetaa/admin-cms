@@ -395,17 +395,7 @@ h1, h2, h3, h4, h5, h6 {
     border-top: 1px solid var(--color-border);
 }
 
-/* Audio Module Specific */
-.file-list table {
-    width: 100%;
-    border-collapse: collapse;
-}
 
-.file-list th, .file-list td {
-    padding: var(--spacing-sm);
-    text-align: left;
-    border-bottom: 1px solid var(--color-border);
-}
 
 .badge {
     padding: 0.25rem 0.5rem;
@@ -425,12 +415,7 @@ h1, h2, h3, h4, h5, h6 {
     color: #92400e;
 }
 
-.instr-params label {
-    font-size: 0.8rem;
-    color: #666;
-    display: block;
-    margin-bottom: 2px;
-}
+
 
 .btn-sm {
     padding: 0.25rem 0.5rem;

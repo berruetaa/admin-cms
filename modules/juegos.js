@@ -153,7 +153,7 @@ export const Juegos = {
 
   showGameModal(index = null) {
     const isEdit = index !== null;
-    const game = isEdit ? this.data[index] : { id: '', name: '', url: '', category: '', description: '', iframeUrl: '', bgmUrl: '', instrumentPreset: 'lead' };
+    const game = isEdit ? this.data[index] : { id: '', name: '', url: '', category: '', description: '', iframeUrl: '' };
 
     const overlay = Modal.create(
       isEdit ? "Editar Juego" : "Nuevo Juego",
@@ -176,16 +176,6 @@ export const Juegos = {
               <label for="generate-page" style="margin:0; font-weight: 500;">Generar/Actualizar archivo index.html en el repositorio</label>
           </div>
 
-          <hr style="margin: 1.5rem 0; opacity: 0.2;">
-          <h4 style="margin-bottom: 0.5rem;">Configuración de Audio</h4>
-          ${Form.renderField({ id: "bgmUrl", label: "Música de Fondo (URL .mid)", value: game.bgmUrl || '', type: "text", placeholder: "ej: /assets/sounds/korobeiniki.mid" })}
-          <div class="form-group">
-            <label for="instrumentPreset">Estilo de Instrumento</label>
-            <select id="instrumentPreset" class="form-control">
-              <option value="lead" ${game.instrumentPreset === 'lead' ? 'selected' : ''}>8-bit Retro (Square)</option>
-              <option value="bass" ${game.instrumentPreset === 'bass' ? 'selected' : ''}>Sub Bass (Triangle)</option>
-              <option value="pads" ${game.instrumentPreset === 'pads' ? 'selected' : ''}>Smooth Pads (Sawtooth)</option>
-            </select>
           </div>
         </form>
       `,
@@ -203,10 +193,8 @@ export const Juegos = {
       const formData = Form.getFormData(form, [
         {id: "id", type: "text"}, {id: "name", type: "text"},
         {id: "category", type: "text"}, {id: "url", type: "text"},
-        {id: "description", type: "textarea"}, {id: "iframeUrl", type: "text"},
-        {id: "bgmUrl", type: "text"}
+        {id: "description", type: "textarea"}, {id: "iframeUrl", type: "text"}
       ]);
-      formData.instrumentPreset = form.querySelector("#instrumentPreset").value;
 
       const shouldGenerate = overlay.querySelector("#generate-page").checked;
 
