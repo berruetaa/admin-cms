@@ -22,12 +22,45 @@ const routes = {
 };
 
 export const Router = {
+  _isRevertingHash: false,
+
   init() {
-    window.addEventListener("hashchange", () => this.handleRoute());
+    window.addEventListener("hashchange", (event) => this.handleRoute(event));
     this.handleRoute();
   },
 
-  async handleRoute() {
+  _resolveModule(hash) {
+    if (routes[hash]) return routes[hash];
+    const nestedMatch = Object.entries(routes).find(([routeKey]) => hash === routeKey || hash.startsWith(`${routeKey}/`));
+    return nestedMatch ? nestedMatch[1] : Dashboard;
+  },
+
+  _runLeaveGuard(event) {
+    if (!event || !event.oldURL || !event.newURL) return true;
+    if (this._isRevertingHash) {
+      this._isRevertingHash = false;
+      return true;
+    }
+
+    const guard = window.__cmsRouteLeaveGuard;
+    if (typeof guard !== "function") return true;
+
+    const oldHash = new URL(event.oldURL).hash || "#/dashboard";
+    const newHash = new URL(event.newURL).hash || "#/dashboard";
+    const canLeave = guard({ from: oldHash, to: newHash });
+
+    if (!canLeave) {
+      this._isRevertingHash = true;
+      window.location.hash = oldHash;
+      return false;
+    }
+
+    return true;
+  },
+
+  async handleRoute(event = null) {
+    if (!this._runLeaveGuard(event)) return;
+
     const hash = window.location.hash.slice(1) || "/dashboard";
     const appElement = document.getElementById("app");
 
@@ -60,7 +93,7 @@ export const Router = {
     Navbar.setActive(window.location.hash);
 
     const mainContent = document.getElementById("main-content");
-    const module = routes[hash] || Dashboard;
+    const module = this._resolveModule(hash);
 
     try {
       if (module && typeof module.render === "function") {

@@ -60,7 +60,11 @@ export const Navbar = {
 
   setActive(hash) {
     document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
-    const activeLink = document.querySelector(`.sidebar-nav a[href="${hash}"]`);
+    let activeHash = hash;
+    if (hash && hash.startsWith('#/academico')) {
+      activeHash = '#/academico';
+    }
+    const activeLink = document.querySelector(`.sidebar-nav a[href="${activeHash}"]`);
     if (activeLink) activeLink.classList.add('active');
   },
 
