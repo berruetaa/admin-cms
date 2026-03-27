@@ -96,6 +96,107 @@ test.describe('Admin CMS Functionality', () => {
     expect(savedResource.id).toBeUndefined();
   });
 
+  test('Academic wizard saves texto as dynamic markdown resource', async ({ page }) => {
+    const getCaptured = await mockAcademicGist(page, {
+      categories: [{ id: 'quimica', name: 'Quimica', description: '...', url: '/academico/quimica/' }],
+      resources: []
+    });
+
+    await page.goto('http://localhost:3000/#/academico/nuevo');
+    await page.selectOption('#wizard-type', 'texto');
+    await page.fill('#wizard-title', 'Guia Markdown');
+    await page.click('#wizard-next');
+
+    await page.fill('#wizard-group', 'Grupo MD');
+    await page.fill('#wizard-description', 'Material dinamico en markdown');
+    await page.click('#wizard-next');
+
+    await page.fill('#wizard-content', '# Titulo\n\n- Punto 1\n- Punto 2');
+    await page.click('#wizard-next');
+    await page.click('#wizard-save');
+
+    await expect.poll(() => getCaptured()).not.toBeNull();
+
+    const decodedContent = JSON.parse(getCaptured().files['data.json'].content);
+    const savedResource = decodedContent.resources[0];
+
+    expect(savedResource.type).toBe('texto');
+    expect(savedResource.content_format).toBe('md');
+    expect(savedResource.content_md).toContain('# Titulo');
+    expect(savedResource.content_id).toBeTruthy();
+    expect(savedResource.url).toBe(`/academico/recursos/?id=${savedResource.content_id}`);
+  });
+
+  test('Academic wizard allows selecting internal route for link resources', async ({ page }) => {
+    const getCaptured = await mockAcademicGist(page, {
+      categories: [{ id: 'quimica', name: 'Quimica', description: '...', url: '/academico/quimica/' }],
+      resources: []
+    });
+
+    await page.route(url => url.href.includes('/repos/berruetaa/berrueta-site/contents'), async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const requestUrl = new URL(route.request().url());
+      const marker = '/repos/berruetaa/berrueta-site/contents/';
+      const markerIndex = requestUrl.pathname.indexOf(marker);
+      const path = markerIndex === -1 ? '' : decodeURIComponent(requestUrl.pathname.slice(markerIndex + marker.length));
+
+      if (!path) {
+        await route.fulfill({
+          json: [
+            { type: 'dir', name: 'academico', path: 'academico' },
+            { type: 'file', name: 'index.html', path: 'index.html' }
+          ]
+        });
+        return;
+      }
+
+      if (path === 'academico') {
+        await route.fulfill({
+          json: [
+            { type: 'file', name: 'index.html', path: 'academico/index.html' },
+            { type: 'dir', name: 'matematica', path: 'academico/matematica' }
+          ]
+        });
+        return;
+      }
+
+      if (path === 'academico/matematica') {
+        await route.fulfill({
+          json: [
+            { type: 'file', name: 'index.html', path: 'academico/matematica/index.html' }
+          ]
+        });
+        return;
+      }
+
+      await route.fulfill({ json: [] });
+    });
+
+    await page.goto('http://localhost:3000/#/academico/nuevo');
+    await page.fill('#wizard-title', 'Ruta Interna');
+    await page.click('#wizard-next');
+
+    await page.fill('#wizard-group', 'Grupo Ruta');
+    await page.fill('#wizard-description', 'Seleccion de ruta interna');
+    await page.click('#wizard-next');
+
+    await page.click('#wizard-load-routes');
+    await expect(page.locator('#wizard-internal-route')).toBeVisible();
+    await page.selectOption('#wizard-internal-route', '/academico/matematica/');
+    await expect(page.locator('#wizard-url')).toHaveValue('/academico/matematica/');
+
+    await page.click('#wizard-next');
+    await page.click('#wizard-save');
+
+    await expect.poll(() => getCaptured()).not.toBeNull();
+    const decodedContent = JSON.parse(getCaptured().files['data.json'].content);
+    expect(decodedContent.resources[0].url).toBe('/academico/matematica/');
+  });
+
   test('Academic wizard restores local draft when reopening', async ({ page }) => {
     await mockAcademicGist(page, {
       categories: [{ id: 'quimica', name: 'Quimica', description: '...', url: '/academico/quimica/' }],

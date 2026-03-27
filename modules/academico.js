@@ -8,6 +8,7 @@ import { Sitemap } from "../utils/sitemap.js";
 import { Autosave } from "../utils/autosave.js";
 
 const DATA_PATH = "academico/data.json";
+const TEXT_RESOURCE_BASE_PATH = "/academico/recursos/";
 
 const RESOURCE_TYPE_LABELS = {
   link: "Enlace",
@@ -48,6 +49,7 @@ export const Academico = {
   selectedIndices: new Set(),
   wizard: null,
   _routeGuardFn: null,
+  siteRoutesCache: null,
 
   async render(container) {
     container.innerHTML = `
@@ -192,10 +194,164 @@ export const Academico = {
       type: resource?.type || "link",
       url: resource?.url || "",
       description: resource?.description || "",
-      content: "",
+      content: resource?.content_md || "",
+      contentId: resource?.content_id || this._extractTextContentId(resource?.url) || "",
       replaceFile: false,
-      replaceContent: false
     };
+  },
+
+  _extractTextContentId(url) {
+    if (!url || typeof url !== "string") return "";
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const id = parsed.searchParams.get("id");
+      return this._sanitizeContentId(id || "");
+    } catch (error) {
+      const match = url.match(/[?&]id=([^&]+)/i);
+      if (!match) return "";
+      return this._sanitizeContentId(decodeURIComponent(match[1]));
+    }
+  },
+
+  _sanitizeContentId(value) {
+    return slugify(value || "");
+  },
+
+  _buildTextResourceUrl(contentId) {
+    return `${TEXT_RESOURCE_BASE_PATH}?id=${encodeURIComponent(contentId)}`;
+  },
+
+  _collectExistingTextContentIds(excludeIndex = null) {
+    const ids = new Set();
+    this.data.resources.forEach((resource, index) => {
+      if (resource.type !== "texto") return;
+      if (excludeIndex !== null && index === excludeIndex) return;
+
+      const id = this._sanitizeContentId(resource.content_id || this._extractTextContentId(resource.url) || "");
+      if (id) ids.add(id);
+    });
+    return ids;
+  },
+
+  _resolveTextContentId(title) {
+    const isEdit = this.wizard.mode === "edit";
+    const sameTypeEdit = isEdit && this.wizard.originalResource?.type === "texto";
+    const excludeIndex = isEdit ? this.wizard.editIndex : null;
+    const reserved = this._collectExistingTextContentIds(excludeIndex);
+
+    const fromDraft = this._sanitizeContentId(this.wizard.data.contentId || "");
+    const fromOriginal = sameTypeEdit
+      ? this._sanitizeContentId(this.wizard.originalResource?.content_id || this._extractTextContentId(this.wizard.originalResource?.url) || "")
+      : "";
+    const fallbackBase = this._sanitizeContentId(title) || `articulo-${Date.now()}`;
+
+    let candidate = fromOriginal || fromDraft || fallbackBase;
+    if (!candidate) candidate = `articulo-${Date.now()}`;
+
+    if (!reserved.has(candidate)) {
+      this.wizard.data.contentId = candidate;
+      return candidate;
+    }
+
+    let suffix = 2;
+    let uniqueCandidate = `${candidate}-${suffix}`;
+    while (reserved.has(uniqueCandidate)) {
+      suffix += 1;
+      uniqueCandidate = `${candidate}-${suffix}`;
+    }
+
+    this.wizard.data.contentId = uniqueCandidate;
+    return uniqueCandidate;
+  },
+
+  _shouldIgnoreSitePath(path) {
+    if (!path) return true;
+    const normalized = path.replace(/\\/g, "/").replace(/^\//, "");
+    const segments = normalized.split("/");
+    const rootDir = segments[0];
+    const ignoredRoots = new Set([
+      ".github",
+      ".vscode",
+      "node_modules",
+      "scripts",
+      "src",
+      "admin-cms",
+      "tests"
+    ]);
+
+    if (ignoredRoots.has(rootDir)) return true;
+    if (normalized.startsWith(".")) return true;
+    if (segments.some((segment) => segment.startsWith("."))) return true;
+    return false;
+  },
+
+  _isLinkableSiteFile(path) {
+    if (!path || this._shouldIgnoreSitePath(path)) return false;
+    const normalized = path.toLowerCase();
+    if (normalized.endsWith(".md")) return false;
+    return /\.(html?|pdf|epub|txt|docx?)$/i.test(path);
+  },
+
+  _toPublicRoute(path) {
+    const clean = (path || "").replace(/^\/+/, "");
+    if (!clean) return "/";
+
+    if (clean.toLowerCase() === "index.html") return "/";
+    if (/\/index\.html$/i.test(clean)) {
+      return `/${clean.replace(/\/index\.html$/i, "/")}`;
+    }
+    return `/${clean}`;
+  },
+
+  async _collectSiteRoutes(path = "", depth = 0, maxDepth = 4) {
+    if (depth > maxDepth) return [];
+    const entries = await GitHubAPI.getDirectory(REPOS.site, path);
+    if (!Array.isArray(entries)) return [];
+
+    const routes = [];
+
+    for (const entry of entries) {
+      if (entry.type === "dir") {
+        if (this._shouldIgnoreSitePath(entry.path, true)) continue;
+        const nested = await this._collectSiteRoutes(entry.path, depth + 1, maxDepth);
+        routes.push(...nested);
+        continue;
+      }
+
+      if (entry.type !== "file") continue;
+      if (!this._isLinkableSiteFile(entry.path)) continue;
+      routes.push(this._toPublicRoute(entry.path));
+    }
+
+    return routes;
+  },
+
+  async _loadSiteRouteOptions({ force = false } = {}) {
+    if (!this.wizard) return;
+    if (this.wizard.linkPathLoading) return;
+
+    if (!force && Array.isArray(this.siteRoutesCache) && this.siteRoutesCache.length > 0) {
+      this.wizard.linkPathOptions = [...this.siteRoutesCache];
+      this.wizard.linkPathError = "";
+      this.renderCurrentView();
+      return;
+    }
+
+    this.wizard.linkPathLoading = true;
+    this.wizard.linkPathError = "";
+    this.renderCurrentView();
+
+    try {
+      const allRoutes = await this._collectSiteRoutes("", 0, 4);
+      const uniqueRoutes = [...new Set(allRoutes)].sort((a, b) => a.localeCompare(b));
+      this.siteRoutesCache = uniqueRoutes;
+      this.wizard.linkPathOptions = [...uniqueRoutes];
+    } catch (error) {
+      this.wizard.linkPathError = `No se pudieron cargar rutas internas: ${error.message}`;
+    } finally {
+      this.wizard.linkPathLoading = false;
+      this.renderCurrentView();
+    }
   },
 
   _ensureWizardInitialized(route) {
@@ -217,6 +373,9 @@ export const Academico = {
       draftKey,
       restoredAt: null,
       selectedFile: null,
+      linkPathOptions: Array.isArray(this.siteRoutesCache) ? [...this.siteRoutesCache] : [],
+      linkPathLoading: false,
+      linkPathError: "",
       errors: {},
       isDirty: false
     };
@@ -265,6 +424,9 @@ export const Academico = {
       draftKey: this._wizardDraftKey(route),
       restoredAt: null,
       selectedFile: null,
+      linkPathOptions: Array.isArray(this.siteRoutesCache) ? [...this.siteRoutesCache] : [],
+      linkPathLoading: false,
+      linkPathError: "",
       errors: {},
       isDirty: false
     };
@@ -889,12 +1051,37 @@ export const Academico = {
     const originalUrl = this.wizard.originalResource?.url || this._wizardFieldValue("url") || "";
 
     if (type === "link") {
+      const hasRoutes = Array.isArray(this.wizard.linkPathOptions) && this.wizard.linkPathOptions.length > 0;
+      const loadButtonLabel = this.wizard.linkPathLoading
+        ? "Cargando rutas..."
+        : hasRoutes
+          ? "Recargar rutas internas"
+          : "Cargar rutas internas";
+
       return `
         <div class="form-group">
           <label for="wizard-url">URL del recurso <span class="text-danger">*</span></label>
           <input id="wizard-url" class="form-control" data-wizard-field="url" value="${escapeHtml(this._wizardFieldValue("url"))}" placeholder="https://... o /academico/...">
           <small class="text-muted">Acepta enlaces externos (http/https) o rutas internas que empiecen con <code>/</code>.</small>
           <div class="wizard-error" data-error-for="url"></div>
+        </div>
+
+        <div class="card wizard-link-picker" style="padding:0.85rem; margin-top:0.75rem;">
+          <div class="wizard-link-picker-head" style="display:flex; gap:0.75rem; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+            <strong>Seleccionar ruta interna</strong>
+            <button type="button" id="wizard-load-routes" class="btn btn-sm btn-outline" ${this.wizard.linkPathLoading ? "disabled" : ""}>${loadButtonLabel}</button>
+          </div>
+          <p class="text-muted" style="font-size:0.82rem; margin:0.45rem 0 0;">Carga rutas publicas del sitio para elegir sin escribirlas manualmente.</p>
+          ${this.wizard.linkPathError ? `<div class="wizard-error" style="min-height:0; margin-top:0.45rem;">${escapeHtml(this.wizard.linkPathError)}</div>` : ""}
+          ${hasRoutes ? `
+            <div class="form-group" style="margin-top:0.7rem; margin-bottom:0;">
+              <label for="wizard-internal-route">Rutas encontradas</label>
+              <select id="wizard-internal-route" class="form-control">
+                <option value="">Selecciona una ruta...</option>
+                ${this.wizard.linkPathOptions.map((route) => `<option value="${escapeHtml(route)}" ${this._wizardFieldValue("url") === route ? "selected" : ""}>${escapeHtml(route)}</option>`).join("")}
+              </select>
+            </div>
+          ` : ""}
         </div>
       `;
     }
@@ -926,26 +1113,27 @@ export const Academico = {
     }
 
     const isNativeTextEdit = isEdit && originalType === "texto";
-    const showReplaceToggle = isNativeTextEdit;
-    const needsContentField = !isNativeTextEdit || this._wizardFieldValue("replaceContent");
+    const contentId = this._sanitizeContentId(this.wizard.data.contentId || "")
+      || this._sanitizeContentId(this.wizard.originalResource?.content_id || "")
+      || this._sanitizeContentId(slugify(this._wizardFieldValue("title")) || "")
+      || "(se genera al guardar)";
+    const previewUrl = contentId && contentId !== "(se genera al guardar)"
+      ? this._buildTextResourceUrl(contentId)
+      : `${TEXT_RESOURCE_BASE_PATH}?id=...`;
 
     return `
-      ${showReplaceToggle ? `
-        <div class="card" style="padding:0.75rem; margin-bottom:1rem;">
-          <div style="font-size:0.9rem;"><strong>Articulo actual:</strong> ${escapeHtml(originalUrl || "(sin URL)")}</div>
-          <label style="display:block; margin-top:0.6rem; font-weight:500;">
-            <input type="checkbox" data-wizard-field="replaceContent" ${this._wizardFieldValue("replaceContent") ? "checked" : ""}> Reemplazar contenido del articulo
-          </label>
-        </div>
-      ` : ""}
+      <div class="card" style="padding:0.75rem; margin-bottom:1rem;">
+        <div style="font-size:0.9rem;"><strong>Articulo dinamico</strong> ${isNativeTextEdit ? `(URL actual: ${escapeHtml(originalUrl || "(sin URL)")})` : ""}</div>
+        <div class="text-muted" style="font-size:0.82rem; margin-top:0.35rem;">ID de contenido: <code>${escapeHtml(contentId)}</code></div>
+        <div class="text-muted" style="font-size:0.82rem; margin-top:0.2rem;">URL publica: <code>${escapeHtml(previewUrl)}</code></div>
+      </div>
 
-      ${needsContentField ? `
-        <div class="form-group">
-          <label for="wizard-content">Contenido del articulo <span class="text-danger">*</span></label>
-          <textarea id="wizard-content" rows="12" class="form-control" data-wizard-field="content" placeholder="Escribi el contenido en texto o HTML">${escapeHtml(this._wizardFieldValue("content"))}</textarea>
-          <div class="wizard-error" data-error-for="content"></div>
-        </div>
-      ` : ""}
+      <div class="form-group">
+        <label for="wizard-content">Contenido Markdown <span class="text-danger">*</span></label>
+        <textarea id="wizard-content" rows="14" class="form-control" data-wizard-field="content" placeholder="# Titulo\n\nEscribe aqui en Markdown...">${escapeHtml(this._wizardFieldValue("content"))}</textarea>
+        <small class="text-muted">Soporta Markdown: titulos, listas, negrita, italica, enlaces, codigo y bloques de cita.</small>
+        <div class="wizard-error" data-error-for="content"></div>
+      </div>
     `;
   },
 
@@ -1048,6 +1236,18 @@ export const Academico = {
     container.querySelector("#wizard-back-list")?.addEventListener("click", () => this._attemptWizardExit());
     container.querySelector("#wizard-cancel")?.addEventListener("click", () => this._attemptWizardExit());
     container.querySelector("#wizard-discard-draft")?.addEventListener("click", () => this._discardWizardDraft());
+    container.querySelector("#wizard-load-routes")?.addEventListener("click", () => this._loadSiteRouteOptions({ force: true }));
+    container.querySelector("#wizard-internal-route")?.addEventListener("change", (event) => {
+      const route = event.target.value || "";
+      this.wizard.data.url = route;
+      this.wizard.isDirty = true;
+      const urlInput = container.querySelector("#wizard-url");
+      if (urlInput) urlInput.value = route;
+      const stepErrors = this._validateWizardStep(this.wizard.step);
+      this.wizard.errors = stepErrors;
+      this._renderWizardErrors(stepErrors);
+      this._persistWizardDraft();
+    });
 
     container.querySelector("#wizard-prev")?.addEventListener("click", () => {
       this.wizard.step = Math.max(1, this.wizard.step - 1);
@@ -1079,7 +1279,7 @@ export const Academico = {
         this.wizard.data[field] = value;
         this.wizard.isDirty = true;
 
-        if (field === "type" || field === "replaceFile" || field === "replaceContent") {
+        if (field === "type" || field === "replaceFile") {
           this.wizard.errors = {};
           this._persistWizardDraft();
           this.renderCurrentView();
@@ -1173,15 +1373,8 @@ export const Academico = {
       }
 
       if (d.type === "texto") {
-        const nativeTextEdit = isEdit && originalType === "texto";
-        const needsContent = !nativeTextEdit || !!d.replaceContent;
-
-        if (needsContent && (!d.content || !d.content.trim())) {
+        if (!d.content || !d.content.trim()) {
           errors.content = "Escribe el contenido del articulo.";
-        }
-
-        if (!needsContent && !(this.wizard.originalResource?.url || d.url)) {
-          errors.content = "Este articulo no tiene URL asociada. Debes reemplazar su contenido.";
         }
       }
 
@@ -1237,59 +1430,6 @@ export const Academico = {
     return `/${path}`;
   },
 
-  _buildTextResourceHtml(baseData, contentHtml) {
-    return `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${baseData.title} | Academico</title>
-  <link rel="stylesheet" href="/src/css/styles.css">
-</head>
-<body>
-  <main class="main-content">
-    <article style="max-width: 800px; margin: 0 auto; padding: 2rem 1rem;">
-      <a href="/academico/">&larr; Volver a Academico</a>
-      <h1>${baseData.title}</h1>
-      <p style="color:#666;">Recurso de ${baseData.category} | ${baseData.group}${baseData.subgroup ? ` | ${baseData.subgroup}` : ""}</p>
-      <div>${contentHtml.replace(/\n/g, "<br>")}</div>
-    </article>
-  </main>
-  <script type="module" src="/src/js/main.js"></script>
-</body>
-</html>`;
-  },
-
-  async _upsertTextResource(baseData, content) {
-    let path;
-    const isEdit = this.wizard.mode === "edit";
-    const originalUrl = this.wizard.originalResource?.url || "";
-
-    if (isEdit && this.wizard.originalResource?.type === "texto" && /^\/academico\/recursos\/.+\.html$/i.test(originalUrl)) {
-      path = originalUrl.replace(/^\//, "");
-    } else {
-      const slug = slugify(baseData.title) || `recurso-${Date.now()}`;
-      path = `academico/recursos/${slug}.html`;
-    }
-
-    const template = this._buildTextResourceHtml(baseData, content);
-    const { Base64 } = await import("../utils/base64.js");
-    const base64Content = Base64.encode(template);
-
-    try {
-      const existing = await GitHubAPI.getFile(REPOS.site, path);
-      await GitHubAPI.updateFile(REPOS.site, path, base64Content, `Actualizar articulo: ${baseData.title}`, existing.sha);
-    } catch (err) {
-      if (err.message.includes("404") || err.message.includes("Not Found")) {
-        await GitHubAPI.createFile(REPOS.site, path, base64Content, `Crear articulo: ${baseData.title}`);
-      } else {
-        throw err;
-      }
-    }
-
-    return `/${path}`;
-  },
-
   async _saveWizardResource() {
     const allErrors = this._validateWizardAll();
     if (Object.keys(allErrors).length > 0) {
@@ -1330,12 +1470,11 @@ export const Academico = {
           ? await this._uploadPdfFile(this.wizard.selectedFile)
           : (this.wizard.originalResource?.url || d.url || "");
       } else if (d.type === "texto") {
-        const nativeTextEdit = this.wizard.mode === "edit" && this.wizard.originalResource?.type === "texto";
-        const needsContent = !nativeTextEdit || !!d.replaceContent;
-
-        finalUrl = needsContent
-          ? await this._upsertTextResource(baseData, d.content.trim())
-          : (this.wizard.originalResource?.url || d.url || "");
+        const contentId = this._resolveTextContentId(baseData.title);
+        finalUrl = this._buildTextResourceUrl(contentId);
+        baseData.content_id = contentId;
+        baseData.content_md = d.content.trim();
+        baseData.content_format = "md";
       }
 
       baseData.url = finalUrl;
