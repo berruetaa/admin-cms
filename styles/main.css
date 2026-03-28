@@ -289,45 +289,51 @@ h1, h2, h3, h4, h5, h6, .logo {
   justify-content: flex-end;
 }
 
-.wizard-progress {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
 .wizard-progress-meta {
   font-size: 0.78rem;
   color: #666;
   margin-top: 0.35rem;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.6rem;
 }
 
-.wizard-progress-step {
+.wizard-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.wizard-step {
   position: relative;
   flex: 1;
-  padding: 0.15rem 0;
+  background: #f7f7f7;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.45rem 0.6rem;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
-.wizard-progress-step::after {
+.wizard-step::after {
   content: "";
   position: absolute;
-  top: 0.88rem;
-  right: -0.25rem;
-  width: calc(100% - 1.8rem);
+  top: 50%;
+  right: -0.36rem;
+  width: 0.32rem;
   height: 2px;
   background: var(--color-border);
   z-index: 0;
 }
 
-.wizard-progress-step:last-child::after {
+.wizard-step:last-child::after {
   display: none;
 }
 
-.wizard-progress-dot {
+.wizard-step-dot {
   width: 1.65rem;
   height: 1.65rem;
   border-radius: 999px;
@@ -343,34 +349,133 @@ h1, h2, h3, h4, h5, h6, .logo {
   z-index: 1;
 }
 
-.wizard-progress-step small {
-  font-size: 0.73rem;
-  color: #666;
+.wizard-step-label {
+  font-size: 0.76rem;
+  color: #555;
   font-weight: 600;
   line-height: 1.2;
 }
 
-.wizard-progress-step.is-current {
+.wizard-step.is-current {
+  background: #fff8ea;
+  border-color: #eac06f;
   color: var(--color-foreground);
 }
 
-.wizard-progress-step.is-current .wizard-progress-dot {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(80, 80, 80, 0.09);
+.wizard-step.is-current .wizard-step-dot {
+  border-color: #d89d2d;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(216, 157, 45, 0.18);
 }
 
-.wizard-progress-step.is-done {
+.wizard-step.is-done {
+  background: #f4fbf6;
+  border-color: #a8ddc0;
   color: #116e3a;
 }
 
-.wizard-progress-step.is-done .wizard-progress-dot {
+.wizard-step.is-done .wizard-step-dot {
   border-color: #6bb887;
   background: #f4fbf6;
   color: #116e3a;
 }
 
-.wizard-progress-step.is-done::after {
+.wizard-step.is-done .wizard-step-label {
+  color: #0f6536;
+}
+
+.wizard-step.is-done::after {
   background: #8fcea7;
+}
+
+.resource-list-shell {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-background);
+  overflow: hidden;
+}
+
+.resource-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+  background: #fafafa;
+  flex-wrap: wrap;
+}
+
+.resource-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.resource-list-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.resource-card {
+  padding: 0.85rem 0.95rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 0.9rem;
+  justify-content: space-between;
+}
+
+.resource-card:last-child {
+  border-bottom: none;
+}
+
+.resource-card.is-selected {
+  background: #fff9ed;
+}
+
+.resource-card-main {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.resource-card-check {
+  padding-top: 0.2rem;
+}
+
+.resource-card-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.resource-card-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.resource-card-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 0.6rem;
+  font-size: 0.86rem;
+}
+
+.resource-card-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-end;
+}
+
+.resource-order-actions,
+.resource-main-actions {
+  display: flex;
+  gap: 0.4rem;
 }
 
 .wizard-grid {
@@ -877,14 +982,27 @@ h1, h2, h3, h4, h5, h6, .logo {
     justify-content: flex-start;
   }
 
-  .wizard-progress {
+  .wizard-steps {
     flex-direction: column;
     align-items: stretch;
     gap: 0.35rem;
   }
 
-  .wizard-progress-step::after {
+  .wizard-step::after {
     display: none;
+  }
+
+  .resource-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resource-card-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-card-side {
+    align-items: flex-start;
   }
 
   .wizard-grid-2 {

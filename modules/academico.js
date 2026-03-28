@@ -673,64 +673,68 @@ export const Academico = {
     }
 
     const categoryMap = this._categoryMap();
+    const allVisibleSelected = filtered.length > 0 && filtered.every((res) => this.selectedIndices.has(this.data.resources.indexOf(res)));
 
     let html = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th style="width:32px; text-align:center;"><input type="checkbox" id="select-all-res"></th>
-            <th>Orden</th>
-            <th>Titulo</th>
-            <th>Categoria</th>
-            <th>Grupo / Subgrupo</th>
-            <th>Tipo</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="resource-list-shell">
+        <div class="resource-list-toolbar">
+          <label class="resource-select-all">
+            <input type="checkbox" id="select-all-res" ${allVisibleSelected ? "checked" : ""}>
+            <span>Seleccionar visibles</span>
+          </label>
+          <span class="text-muted" style="font-size:0.8rem;">Ordena con las flechas y usa acciones rápidas por recurso.</span>
+        </div>
+        <div class="resource-list-grid">
     `;
 
     filtered.forEach((res) => {
       const originalIndex = this.data.resources.indexOf(res);
       const total = this.data.resources.length;
       const categoryName = categoryMap.get(res.category) || res.category;
-      const subgroup = res.subgroup ? `<span style="color:#666;">${escapeHtml(res.subgroup)}</span>` : "<span class=\"text-muted\">-</span>";
+      const subgroup = res.subgroup ? escapeHtml(res.subgroup) : "Sin subgrupo";
       const typeClass = `type-pill-${escapeHtml(res.type || "link")}`;
+      const tags = Array.isArray(res.tags) && res.tags.length
+        ? res.tags.slice(0, 4).map((tag) => `<span class="type-pill" style="margin-right:0.3rem;">${escapeHtml(tag)}</span>`).join("")
+        : '<span class="text-muted" style="font-size:0.78rem;">Sin tags</span>';
 
       html += `
-        <tr>
-          <td style="width:32px; text-align:center;">
+        <article class="resource-card ${this.selectedIndices.has(originalIndex) ? "is-selected" : ""}">
+          <div class="resource-card-main">
+            <div class="resource-card-check">
             <input type="checkbox" class="res-checkbox" data-index="${originalIndex}" ${this.selectedIndices.has(originalIndex) ? "checked" : ""}>
-          </td>
-          <td class="actions" style="white-space:nowrap;">
-            <button class="btn btn-sm btn-outline btn-move-up" data-index="${originalIndex}" ${originalIndex === 0 ? "disabled" : ""} title="Subir">?</button>
-            <button class="btn btn-sm btn-outline btn-move-down" data-index="${originalIndex}" ${originalIndex === total - 1 ? "disabled" : ""} title="Bajar">?</button>
-          </td>
-          <td>
-            <strong>${escapeHtml(res.title)}</strong>
-            ${res.description ? `<div class="text-muted" style="font-size:0.8rem; margin-top:0.2rem;">${escapeHtml(res.description)}</div>` : ""}
-          </td>
-          <td>
-            <strong>${escapeHtml(categoryName || "Sin categoria")}</strong>
-            <div class="text-muted" style="font-size:0.75rem;">${escapeHtml(res.category || "-")}</div>
-          </td>
-          <td style="font-size:0.9rem;">
-            <strong>${escapeHtml(res.group || "-")}</strong>
-            <div style="margin-top:0.2rem;">${subgroup}</div>
-          </td>
-          <td>
-            <span class="type-pill ${typeClass}">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type || "-")}</span>
-          </td>
-          <td class="actions">
-            <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${originalIndex}">Editar</button>
-            <button class="btn btn-sm btn-warning btn-duplicate-res" data-index="${originalIndex}">Duplicar</button>
-            <button class="btn btn-sm btn-danger btn-delete-res" data-index="${originalIndex}">Borrar</button>
-          </td>
-        </tr>
+            </div>
+
+            <div class="resource-card-content">
+              <div class="resource-card-title-row">
+                <strong>${escapeHtml(res.title)}</strong>
+                <span class="type-pill ${typeClass}">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type || "-")}</span>
+              </div>
+              ${res.description ? `<p class="text-muted" style="margin-top:0.3rem; margin-bottom:0.5rem;">${escapeHtml(res.description)}</p>` : ""}
+              <div class="resource-card-meta">
+                <div><span class="text-muted">Categoria</span><br><strong>${escapeHtml(categoryName || "Sin categoria")}</strong> <small class="text-muted">(${escapeHtml(res.category || "-")})</small></div>
+                <div><span class="text-muted">Grupo</span><br><strong>${escapeHtml(res.group || "-")}</strong></div>
+                <div><span class="text-muted">Subgrupo</span><br><strong>${subgroup}</strong></div>
+              </div>
+              <div style="margin-top:0.55rem;">${tags}</div>
+            </div>
+          </div>
+
+          <div class="resource-card-side">
+            <div class="resource-order-actions">
+              <button class="btn btn-sm btn-outline btn-move-up" data-index="${originalIndex}" ${originalIndex === 0 ? "disabled" : ""} title="Subir">↑</button>
+              <button class="btn btn-sm btn-outline btn-move-down" data-index="${originalIndex}" ${originalIndex === total - 1 ? "disabled" : ""} title="Bajar">↓</button>
+            </div>
+            <div class="resource-main-actions">
+              <button class="btn btn-sm btn-secondary btn-edit-res" data-index="${originalIndex}">Editar</button>
+              <button class="btn btn-sm btn-warning btn-duplicate-res" data-index="${originalIndex}">Duplicar</button>
+              <button class="btn btn-sm btn-danger btn-delete-res" data-index="${originalIndex}">Borrar</button>
+            </div>
+          </div>
+        </article>
       `;
     });
 
-    html += `</tbody></table>`;
+    html += `</div></div>`;
     container.innerHTML = html;
 
     container.querySelectorAll(".btn-edit-res").forEach((btn) => btn.addEventListener("click", (e) => this.showResourceModal(parseInt(e.target.dataset.index, 10))));
@@ -743,7 +747,6 @@ export const Academico = {
     const rowCheckboxes = container.querySelectorAll(".res-checkbox");
 
     if (selectAllCheckbox) {
-      const allVisibleSelected = filtered.length > 0 && filtered.every((res) => this.selectedIndices.has(this.data.resources.indexOf(res)));
       selectAllCheckbox.checked = allVisibleSelected;
 
       selectAllCheckbox.addEventListener("change", (e) => {
@@ -978,18 +981,18 @@ export const Academico = {
   _renderWizardProgress() {
     return `
       <div class="wizard-progress-meta">Paso ${this.wizard.step} de ${WIZARD_STEPS.length}</div>
-      <div class="wizard-progress">
+      <ol class="wizard-steps" aria-label="Progreso del wizard">
         ${WIZARD_STEPS.map((step) => {
           const current = this.wizard.step === step.id;
           const done = this.wizard.step > step.id;
           return `
-            <div class="wizard-progress-step ${current ? "is-current" : ""} ${done ? "is-done" : ""}">
-              <span class="wizard-progress-dot">${done ? "✓" : step.id}</span>
-              <small>${step.label}</small>
-            </div>
+            <li class="wizard-step ${current ? "is-current" : ""} ${done ? "is-done" : ""}" aria-current="${current ? "step" : "false"}">
+              <span class="wizard-step-dot">${done ? "✓" : step.id}</span>
+              <span class="wizard-step-label">${step.label}</span>
+            </li>
           `;
         }).join("")}
-      </div>
+      </ol>
     `;
   },
 
