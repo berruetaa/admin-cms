@@ -3,7 +3,7 @@ import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
 import { Validators } from "../utils/validators.js";
-import { SearchDataStore } from "../components/navbar.js";
+import { Navbar, SearchDataStore } from "../components/navbar.js";
 import { Sitemap } from "../utils/sitemap.js";
 import { Autosave } from "../utils/autosave.js";
 
@@ -47,6 +47,13 @@ export const Academico = {
   fileSha: null,
   filters: { query: "", category: "all", group: "all", subgroup: "all", type: "all" },
   selectedIndices: new Set(),
+  resourceListSettings: {
+    compact: false,
+    showDescription: true,
+    showTags: true,
+    showCategoryId: true
+  },
+  _settingsListenerBound: null,
   wizard: null,
   _routeGuardFn: null,
   siteRoutesCache: null,
@@ -75,6 +82,7 @@ export const Academico = {
     document.getElementById("btn-import-acad").addEventListener("click", () => this.importData());
 
     await this.loadData();
+    this._ensureResourceSettingsListener();
   },
 
   async loadData() {
@@ -105,7 +113,27 @@ export const Academico = {
   },
 
   renderContent(container) {
+    this._syncResourceListSettings();
     this.renderCurrentView(container);
+  },
+
+  _syncResourceListSettings() {
+    if (typeof Navbar.getResourceListSettings === "function") {
+      this.resourceListSettings = Navbar.getResourceListSettings();
+    }
+  },
+
+  _ensureResourceSettingsListener() {
+    if (this._settingsListenerBound) return;
+    this._settingsListenerBound = () => {
+      this._syncResourceListSettings();
+      const route = this._parseWizardRoute();
+      if (!route) {
+        this.renderResourcesSection();
+      }
+    };
+    window.addEventListener("academico-resource-settings-changed", this._settingsListenerBound);
+    this._syncResourceListSettings();
   },
 
   renderCurrentView(container = document.getElementById("academico-content")) {
@@ -673,6 +701,7 @@ export const Academico = {
     }
 
     const categoryMap = this._categoryMap();
+    const settings = this.resourceListSettings || {};
     const allVisibleSelected = filtered.length > 0 && filtered.every((res) => this.selectedIndices.has(this.data.resources.indexOf(res)));
 
     let html = `
@@ -684,7 +713,7 @@ export const Academico = {
           </label>
           <span class="text-muted" style="font-size:0.8rem;">Ordena con las flechas y usa acciones rápidas por recurso.</span>
         </div>
-        <div class="resource-list-grid">
+        <div class="resource-list-grid ${settings.compact ? "is-compact" : ""}">
     `;
 
     filtered.forEach((res) => {
@@ -696,6 +725,7 @@ export const Academico = {
       const tags = Array.isArray(res.tags) && res.tags.length
         ? res.tags.slice(0, 4).map((tag) => `<span class="type-pill" style="margin-right:0.3rem;">${escapeHtml(tag)}</span>`).join("")
         : '<span class="text-muted" style="font-size:0.78rem;">Sin tags</span>';
+      const categoryExtra = settings.showCategoryId ? ` <small class="text-muted">(${escapeHtml(res.category || "-")})</small>` : "";
 
       html += `
         <article class="resource-card ${this.selectedIndices.has(originalIndex) ? "is-selected" : ""}">
@@ -709,13 +739,13 @@ export const Academico = {
                 <strong>${escapeHtml(res.title)}</strong>
                 <span class="type-pill ${typeClass}">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type || "-")}</span>
               </div>
-              ${res.description ? `<p class="text-muted" style="margin-top:0.3rem; margin-bottom:0.5rem;">${escapeHtml(res.description)}</p>` : ""}
+              ${settings.showDescription && res.description ? `<p class="text-muted" style="margin-top:0.3rem; margin-bottom:0.5rem;">${escapeHtml(res.description)}</p>` : ""}
               <div class="resource-card-meta">
-                <div><span class="text-muted">Categoria</span><br><strong>${escapeHtml(categoryName || "Sin categoria")}</strong> <small class="text-muted">(${escapeHtml(res.category || "-")})</small></div>
+                <div><span class="text-muted">Categoria</span><br><strong>${escapeHtml(categoryName || "Sin categoria")}</strong>${categoryExtra}</div>
                 <div><span class="text-muted">Grupo</span><br><strong>${escapeHtml(res.group || "-")}</strong></div>
                 <div><span class="text-muted">Subgrupo</span><br><strong>${subgroup}</strong></div>
               </div>
-              <div style="margin-top:0.55rem;">${tags}</div>
+              ${settings.showTags ? `<div style="margin-top:0.55rem;">${tags}</div>` : ""}
             </div>
           </div>
 

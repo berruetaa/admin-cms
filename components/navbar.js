@@ -1,6 +1,14 @@
 import { ColorfulTitle } from "./ColorfulTitle.js";
 import { Search } from "../utils/search.js";
 
+const RESOURCE_LIST_SETTINGS_KEY = "cms_academico_resource_list_settings";
+const DEFAULT_RESOURCE_LIST_SETTINGS = {
+  compact: false,
+  showDescription: true,
+  showTags: true,
+  showCategoryId: true
+};
+
 // Shared data store updated by each module when it loads its data
 export const SearchDataStore = {
   blog: [],
@@ -27,13 +35,12 @@ export const Navbar = {
           </a>
         </div>
 
-        <!-- Global Search -->
         <div class="sidebar-search">
           <input
             type="search"
             id="global-search"
             class="form-control"
-            placeholder="🔍 Buscar..."
+            placeholder="Buscar..."
             autocomplete="off"
           >
           <div id="search-results" class="search-results" hidden></div>
@@ -44,84 +51,146 @@ export const Navbar = {
             <li><a href="#/dashboard" id="nav-dashboard" class="nav-link">Dashboard</a></li>
             <li><a href="#/homepage" id="nav-homepage" class="nav-link">Homepage</a></li>
             <li><a href="#/blog" id="nav-blog" class="nav-link">Blog</a></li>
-            <li><a href="#/academico" id="nav-academico" class="nav-link">Académico</a></li>
+            <li><a href="#/academico" id="nav-academico" class="nav-link">Academico</a></li>
             <li><a href="#/files" id="nav-files" class="nav-link">Files</a></li>
             <li><a href="#/tools" id="nav-tools" class="nav-link">Tools</a></li>
             <li><a href="#/juegos" id="nav-juegos" class="nav-link">Juegos</a></li>
             <li><a href="#/system" id="nav-system" class="nav-link">Sistema</a></li>
           </ul>
         </nav>
+
         <div class="sidebar-footer">
-          <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesión</button>
+          <section class="sidebar-settings-card" aria-label="Ajustes">
+            <div class="sidebar-settings-title">Ajustes</div>
+            <p class="sidebar-settings-subtitle">Lista de recursos (Academico)</p>
+            <label class="sidebar-setting-item">
+              <input type="checkbox" id="setting-acad-compact">
+              <span>Vista compacta</span>
+            </label>
+            <label class="sidebar-setting-item">
+              <input type="checkbox" id="setting-acad-desc">
+              <span>Mostrar descripcion</span>
+            </label>
+            <label class="sidebar-setting-item">
+              <input type="checkbox" id="setting-acad-tags">
+              <span>Mostrar tags</span>
+            </label>
+            <label class="sidebar-setting-item">
+              <input type="checkbox" id="setting-acad-catid">
+              <span>Mostrar ID categoria</span>
+            </label>
+          </section>
+          <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesion</button>
         </div>
       </aside>
     `;
   },
 
   setActive(hash) {
-    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll(".sidebar-nav a").forEach((a) => a.classList.remove("active"));
     let activeHash = hash;
-    if (hash && hash.startsWith('#/academico')) {
-      activeHash = '#/academico';
+    if (hash && hash.startsWith("#/academico")) {
+      activeHash = "#/academico";
     }
     const activeLink = document.querySelector(`.sidebar-nav a[href="${activeHash}"]`);
-    if (activeLink) activeLink.classList.add('active');
+    if (activeLink) activeLink.classList.add("active");
   },
 
   init() {
     ColorfulTitle.init();
 
-    // Mobile menu toggle
-    const menuToggle = document.getElementById('menu-toggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
+    const menuToggle = document.getElementById("menu-toggle");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
 
     if (menuToggle && sidebar && overlay) {
       const toggleMenu = () => {
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('show');
+        sidebar.classList.toggle("open");
+        overlay.classList.toggle("show");
       };
-      menuToggle.addEventListener('click', toggleMenu);
-      overlay.addEventListener('click', toggleMenu);
-      document.querySelectorAll('.sidebar-nav a').forEach(link => {
-        link.addEventListener('click', () => {
+      menuToggle.addEventListener("click", toggleMenu);
+      overlay.addEventListener("click", toggleMenu);
+      document.querySelectorAll(".sidebar-nav a").forEach((link) => {
+        link.addEventListener("click", () => {
           if (window.innerWidth <= 768) {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('show');
+            sidebar.classList.remove("open");
+            overlay.classList.remove("show");
           }
         });
       });
     }
 
-    // Logout
-    const logoutBtn = document.getElementById('logout-btn');
+    const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        import('../services/auth.js').then(({ Auth }) => {
+      logoutBtn.addEventListener("click", () => {
+        import("../services/auth.js").then(({ Auth }) => {
           Auth.removeToken();
-          window.location.hash = '#/login';
+          window.location.hash = "#/login";
         });
       });
     }
 
-    // Global search
     this._initSearch();
+    this._initResourceListSettings();
+  },
+
+  getResourceListSettings() {
+    try {
+      const raw = localStorage.getItem(RESOURCE_LIST_SETTINGS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return { ...DEFAULT_RESOURCE_LIST_SETTINGS, ...(parsed || {}) };
+    } catch (error) {
+      return { ...DEFAULT_RESOURCE_LIST_SETTINGS };
+    }
+  },
+
+  _saveResourceListSettings(nextSettings) {
+    const payload = { ...DEFAULT_RESOURCE_LIST_SETTINGS, ...nextSettings };
+    localStorage.setItem(RESOURCE_LIST_SETTINGS_KEY, JSON.stringify(payload));
+    window.dispatchEvent(new CustomEvent("academico-resource-settings-changed", { detail: payload }));
+  },
+
+  _initResourceListSettings() {
+    const compactInput = document.getElementById("setting-acad-compact");
+    const descInput = document.getElementById("setting-acad-desc");
+    const tagsInput = document.getElementById("setting-acad-tags");
+    const catIdInput = document.getElementById("setting-acad-catid");
+    if (!compactInput || !descInput || !tagsInput || !catIdInput) return;
+
+    const settings = this.getResourceListSettings();
+    compactInput.checked = !!settings.compact;
+    descInput.checked = !!settings.showDescription;
+    tagsInput.checked = !!settings.showTags;
+    catIdInput.checked = !!settings.showCategoryId;
+
+    const persist = () => {
+      this._saveResourceListSettings({
+        compact: compactInput.checked,
+        showDescription: descInput.checked,
+        showTags: tagsInput.checked,
+        showCategoryId: catIdInput.checked
+      });
+    };
+
+    [compactInput, descInput, tagsInput, catIdInput].forEach((input) => {
+      input.addEventListener("change", persist);
+    });
   },
 
   _initSearch() {
-    const input = document.getElementById('global-search');
-    const resultsBox = document.getElementById('search-results');
+    const input = document.getElementById("global-search");
+    const resultsBox = document.getElementById("search-results");
     if (!input || !resultsBox) return;
 
     let debounceTimer;
 
-    input.addEventListener('input', () => {
+    input.addEventListener("input", () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         const query = input.value.trim();
         if (query.length < 2) {
           resultsBox.hidden = true;
-          resultsBox.innerHTML = '';
+          resultsBox.innerHTML = "";
           return;
         }
 
@@ -130,7 +199,7 @@ export const Navbar = {
         if (results.length === 0) {
           resultsBox.innerHTML = '<div class="search-no-results">Sin resultados</div>';
         } else {
-          resultsBox.innerHTML = results.map(r => `
+          resultsBox.innerHTML = results.map((r) => `
             <a href="${r.hash}" class="search-result-item" data-hash="${r.hash}">
               <span class="search-result-icon">${r.icon}</span>
               <span class="search-result-body">
@@ -139,29 +208,29 @@ export const Navbar = {
               </span>
               <span class="search-result-section">${r.section}</span>
             </a>
-          `).join('');
+          `).join("");
         }
 
         resultsBox.hidden = false;
       }, 220);
     });
 
-    // Close on click outside
-    document.addEventListener('click', (e) => {
+    document.addEventListener("click", (e) => {
       if (!input.contains(e.target) && !resultsBox.contains(e.target)) {
         resultsBox.hidden = true;
       }
     });
 
-    // Close on result click
-    resultsBox.addEventListener('click', () => {
+    resultsBox.addEventListener("click", () => {
       resultsBox.hidden = true;
-      input.value = '';
+      input.value = "";
     });
 
-    // Close on Escape
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { resultsBox.hidden = true; input.value = ''; }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        resultsBox.hidden = true;
+        input.value = "";
+      }
     });
   }
 };
