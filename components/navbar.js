@@ -27,13 +27,12 @@ export const Navbar = {
           </a>
         </div>
 
-        <!-- Global Search -->
         <div class="sidebar-search">
           <input
             type="search"
             id="global-search"
             class="form-control"
-            placeholder="🔍 Buscar..."
+            placeholder="Buscar..."
             autocomplete="off"
           >
           <div id="search-results" class="search-results" hidden></div>
@@ -44,80 +43,88 @@ export const Navbar = {
             <li><a href="#/dashboard" id="nav-dashboard" class="nav-link">Dashboard</a></li>
             <li><a href="#/homepage" id="nav-homepage" class="nav-link">Homepage</a></li>
             <li><a href="#/blog" id="nav-blog" class="nav-link">Blog</a></li>
-            <li><a href="#/academico" id="nav-academico" class="nav-link">Académico</a></li>
+            <li><a href="#/academico" id="nav-academico" class="nav-link">Academico</a></li>
             <li><a href="#/files" id="nav-files" class="nav-link">Files</a></li>
             <li><a href="#/tools" id="nav-tools" class="nav-link">Tools</a></li>
             <li><a href="#/juegos" id="nav-juegos" class="nav-link">Juegos</a></li>
             <li><a href="#/system" id="nav-system" class="nav-link">Sistema</a></li>
+            <li><a href="#/ajustes" id="nav-ajustes" class="nav-link">Ajustes</a></li>
           </ul>
         </nav>
+
         <div class="sidebar-footer">
-          <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesión</button>
+          <section class="sidebar-settings-shortcut" aria-label="Ajustes">
+            <div class="sidebar-settings-title">Ajustes Globales</div>
+            <p class="sidebar-settings-subtitle">Personaliza el panel, listados y experiencia.</p>
+            <a href="#/ajustes" class="btn btn-outline w-100">Abrir ajustes</a>
+          </section>
+          <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesion</button>
         </div>
       </aside>
     `;
   },
 
   setActive(hash) {
-    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
-    const activeLink = document.querySelector(`.sidebar-nav a[href="${hash}"]`);
-    if (activeLink) activeLink.classList.add('active');
+    document.querySelectorAll(".sidebar-nav a").forEach((a) => a.classList.remove("active"));
+    let activeHash = hash;
+    if (hash && hash.startsWith("#/academico")) {
+      activeHash = "#/academico";
+    }
+    const activeLink = document.querySelector(`.sidebar-nav a[href="${activeHash}"]`);
+    if (activeLink) activeLink.classList.add("active");
   },
 
   init() {
     ColorfulTitle.init();
 
-    // Mobile menu toggle
-    const menuToggle = document.getElementById('menu-toggle');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
+    const menuToggle = document.getElementById("menu-toggle");
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
 
     if (menuToggle && sidebar && overlay) {
       const toggleMenu = () => {
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('show');
+        sidebar.classList.toggle("open");
+        overlay.classList.toggle("show");
       };
-      menuToggle.addEventListener('click', toggleMenu);
-      overlay.addEventListener('click', toggleMenu);
-      document.querySelectorAll('.sidebar-nav a').forEach(link => {
-        link.addEventListener('click', () => {
+      menuToggle.addEventListener("click", toggleMenu);
+      overlay.addEventListener("click", toggleMenu);
+      document.querySelectorAll(".sidebar-nav a").forEach((link) => {
+        link.addEventListener("click", () => {
           if (window.innerWidth <= 768) {
-            sidebar.classList.remove('open');
-            overlay.classList.remove('show');
+            sidebar.classList.remove("open");
+            overlay.classList.remove("show");
           }
         });
       });
     }
 
-    // Logout
-    const logoutBtn = document.getElementById('logout-btn');
+    const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        import('../services/auth.js').then(({ Auth }) => {
+      logoutBtn.addEventListener("click", () => {
+        import("../services/auth.js").then(({ Auth }) => {
           Auth.removeToken();
-          window.location.hash = '#/login';
+          window.location.hash = "#/login";
         });
       });
     }
 
-    // Global search
     this._initSearch();
   },
 
   _initSearch() {
-    const input = document.getElementById('global-search');
-    const resultsBox = document.getElementById('search-results');
+    const input = document.getElementById("global-search");
+    const resultsBox = document.getElementById("search-results");
     if (!input || !resultsBox) return;
 
     let debounceTimer;
 
-    input.addEventListener('input', () => {
+    input.addEventListener("input", () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         const query = input.value.trim();
         if (query.length < 2) {
           resultsBox.hidden = true;
-          resultsBox.innerHTML = '';
+          resultsBox.innerHTML = "";
           return;
         }
 
@@ -126,7 +133,7 @@ export const Navbar = {
         if (results.length === 0) {
           resultsBox.innerHTML = '<div class="search-no-results">Sin resultados</div>';
         } else {
-          resultsBox.innerHTML = results.map(r => `
+          resultsBox.innerHTML = results.map((r) => `
             <a href="${r.hash}" class="search-result-item" data-hash="${r.hash}">
               <span class="search-result-icon">${r.icon}</span>
               <span class="search-result-body">
@@ -135,29 +142,29 @@ export const Navbar = {
               </span>
               <span class="search-result-section">${r.section}</span>
             </a>
-          `).join('');
+          `).join("");
         }
 
         resultsBox.hidden = false;
       }, 220);
     });
 
-    // Close on click outside
-    document.addEventListener('click', (e) => {
+    document.addEventListener("click", (e) => {
       if (!input.contains(e.target) && !resultsBox.contains(e.target)) {
         resultsBox.hidden = true;
       }
     });
 
-    // Close on result click
-    resultsBox.addEventListener('click', () => {
+    resultsBox.addEventListener("click", () => {
       resultsBox.hidden = true;
-      input.value = '';
+      input.value = "";
     });
 
-    // Close on Escape
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { resultsBox.hidden = true; input.value = ''; }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        resultsBox.hidden = true;
+        input.value = "";
+      }
     });
   }
 };
