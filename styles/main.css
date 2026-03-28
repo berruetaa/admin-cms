@@ -193,7 +193,7 @@ h1, h2, h3, h4, h5, h6, .logo {
   gap: 0.75rem;
 }
 
-.sidebar-settings-card {
+.sidebar-settings-shortcut {
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.65rem 0.7rem;
@@ -212,14 +212,20 @@ h1, h2, h3, h4, h5, h6, .logo {
   margin-bottom: 0.45rem;
 }
 
-.sidebar-setting-item {
+.settings-toggle-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.78rem;
-  margin-top: 0.25rem;
+  gap: 0.8rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--color-border);
 }
 
+.settings-toggle-row:first-of-type {
+  border-top: none;
+}
+
+.settings-toggle-row input,
 .sidebar-setting-item input {
   accent-color: var(--color-accent);
 }
@@ -579,6 +585,23 @@ h1, h2, h3, h4, h5, h6, .logo {
   transform: translateY(-4px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
   border-color: var(--color-accent);
+}
+
+.dense-ui .card {
+  padding: 1.2rem;
+}
+
+.dense-ui .module-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.6rem;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
 }
 
 .card h3, .tool-name, .academic-item-title {

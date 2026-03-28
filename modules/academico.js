@@ -3,9 +3,10 @@ import { REPOS } from "../config/repos.js";
 import { Modal } from "../components/modal.js";
 import { Form } from "../components/form.js";
 import { Validators } from "../utils/validators.js";
-import { Navbar, SearchDataStore } from "../components/navbar.js";
+import { SearchDataStore } from "../components/navbar.js";
 import { Sitemap } from "../utils/sitemap.js";
 import { Autosave } from "../utils/autosave.js";
+import { SettingsStore } from "../utils/settings.js";
 
 const DATA_PATH = "academico/data.json";
 const TEXT_RESOURCE_BASE_PATH = "/academico/recursos/";
@@ -118,9 +119,7 @@ export const Academico = {
   },
 
   _syncResourceListSettings() {
-    if (typeof Navbar.getResourceListSettings === "function") {
-      this.resourceListSettings = Navbar.getResourceListSettings();
-    }
+    this.resourceListSettings = SettingsStore.getAcademicoResourceListSettings();
   },
 
   _ensureResourceSettingsListener() {
@@ -132,7 +131,7 @@ export const Academico = {
         this.renderResourcesSection();
       }
     };
-    window.addEventListener("academico-resource-settings-changed", this._settingsListenerBound);
+    SettingsStore.onChange(this._settingsListenerBound);
     this._syncResourceListSettings();
   },
 

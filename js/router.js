@@ -8,7 +8,9 @@ import { Files } from "../modules/files.js";
 import { Tools } from "../modules/tools.js";
 import { Juegos } from "../modules/juegos.js";
 import { System } from "../modules/system.js";
+import { Settings } from "../modules/settings.js";
 import { ColorfulTitle } from "../components/ColorfulTitle.js";
+import { SettingsStore } from "../utils/settings.js";
 
 const routes = {
   "/dashboard": Dashboard,
@@ -18,7 +20,8 @@ const routes = {
   "/files": Files,
   "/tools": Tools,
   "/juegos": Juegos,
-  "/system": System
+  "/system": System,
+  "/ajustes": Settings
 };
 
 export const Router = {
@@ -26,6 +29,7 @@ export const Router = {
 
   init() {
     window.addEventListener("hashchange", (event) => this.handleRoute(event));
+    SettingsStore.applyRuntime();
     this.handleRoute();
   },
 

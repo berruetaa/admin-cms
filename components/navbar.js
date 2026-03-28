@@ -1,14 +1,6 @@
 import { ColorfulTitle } from "./ColorfulTitle.js";
 import { Search } from "../utils/search.js";
 
-const RESOURCE_LIST_SETTINGS_KEY = "cms_academico_resource_list_settings";
-const DEFAULT_RESOURCE_LIST_SETTINGS = {
-  compact: false,
-  showDescription: true,
-  showTags: true,
-  showCategoryId: true
-};
-
 // Shared data store updated by each module when it loads its data
 export const SearchDataStore = {
   blog: [],
@@ -56,29 +48,15 @@ export const Navbar = {
             <li><a href="#/tools" id="nav-tools" class="nav-link">Tools</a></li>
             <li><a href="#/juegos" id="nav-juegos" class="nav-link">Juegos</a></li>
             <li><a href="#/system" id="nav-system" class="nav-link">Sistema</a></li>
+            <li><a href="#/ajustes" id="nav-ajustes" class="nav-link">Ajustes</a></li>
           </ul>
         </nav>
 
         <div class="sidebar-footer">
-          <section class="sidebar-settings-card" aria-label="Ajustes">
-            <div class="sidebar-settings-title">Ajustes</div>
-            <p class="sidebar-settings-subtitle">Lista de recursos (Academico)</p>
-            <label class="sidebar-setting-item">
-              <input type="checkbox" id="setting-acad-compact">
-              <span>Vista compacta</span>
-            </label>
-            <label class="sidebar-setting-item">
-              <input type="checkbox" id="setting-acad-desc">
-              <span>Mostrar descripcion</span>
-            </label>
-            <label class="sidebar-setting-item">
-              <input type="checkbox" id="setting-acad-tags">
-              <span>Mostrar tags</span>
-            </label>
-            <label class="sidebar-setting-item">
-              <input type="checkbox" id="setting-acad-catid">
-              <span>Mostrar ID categoria</span>
-            </label>
+          <section class="sidebar-settings-shortcut" aria-label="Ajustes">
+            <div class="sidebar-settings-title">Ajustes Globales</div>
+            <p class="sidebar-settings-subtitle">Personaliza el panel, listados y experiencia.</p>
+            <a href="#/ajustes" class="btn btn-outline w-100">Abrir ajustes</a>
           </section>
           <button id="logout-btn" class="btn btn-secondary w-100">Cerrar Sesion</button>
         </div>
@@ -131,50 +109,6 @@ export const Navbar = {
     }
 
     this._initSearch();
-    this._initResourceListSettings();
-  },
-
-  getResourceListSettings() {
-    try {
-      const raw = localStorage.getItem(RESOURCE_LIST_SETTINGS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return { ...DEFAULT_RESOURCE_LIST_SETTINGS, ...(parsed || {}) };
-    } catch (error) {
-      return { ...DEFAULT_RESOURCE_LIST_SETTINGS };
-    }
-  },
-
-  _saveResourceListSettings(nextSettings) {
-    const payload = { ...DEFAULT_RESOURCE_LIST_SETTINGS, ...nextSettings };
-    localStorage.setItem(RESOURCE_LIST_SETTINGS_KEY, JSON.stringify(payload));
-    window.dispatchEvent(new CustomEvent("academico-resource-settings-changed", { detail: payload }));
-  },
-
-  _initResourceListSettings() {
-    const compactInput = document.getElementById("setting-acad-compact");
-    const descInput = document.getElementById("setting-acad-desc");
-    const tagsInput = document.getElementById("setting-acad-tags");
-    const catIdInput = document.getElementById("setting-acad-catid");
-    if (!compactInput || !descInput || !tagsInput || !catIdInput) return;
-
-    const settings = this.getResourceListSettings();
-    compactInput.checked = !!settings.compact;
-    descInput.checked = !!settings.showDescription;
-    tagsInput.checked = !!settings.showTags;
-    catIdInput.checked = !!settings.showCategoryId;
-
-    const persist = () => {
-      this._saveResourceListSettings({
-        compact: compactInput.checked,
-        showDescription: descInput.checked,
-        showTags: tagsInput.checked,
-        showCategoryId: catIdInput.checked
-      });
-    };
-
-    [compactInput, descInput, tagsInput, catIdInput].forEach((input) => {
-      input.addEventListener("change", persist);
-    });
   },
 
   _initSearch() {
