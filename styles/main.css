@@ -290,55 +290,87 @@ h1, h2, h3, h4, h5, h6, .logo {
 }
 
 .wizard-progress {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.wizard-progress-meta {
+  font-size: 0.78rem;
+  color: #666;
+  margin-top: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
 .wizard-progress-step {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-background);
-  padding: 0.55rem 0.65rem;
+  position: relative;
+  flex: 1;
+  padding: 0.15rem 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
-.wizard-progress-step span {
-  width: 1.5rem;
-  height: 1.5rem;
+.wizard-progress-step::after {
+  content: "";
+  position: absolute;
+  top: 0.88rem;
+  right: -0.25rem;
+  width: calc(100% - 1.8rem);
+  height: 2px;
+  background: var(--color-border);
+  z-index: 0;
+}
+
+.wizard-progress-step:last-child::after {
+  display: none;
+}
+
+.wizard-progress-dot {
+  width: 1.65rem;
+  height: 1.65rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
+  background: var(--color-background);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .wizard-progress-step small {
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   color: #666;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .wizard-progress-step.is-current {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(80, 80, 80, 0.08);
+  color: var(--color-foreground);
 }
 
-.wizard-progress-step.is-current span {
+.wizard-progress-step.is-current .wizard-progress-dot {
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(80, 80, 80, 0.09);
 }
 
 .wizard-progress-step.is-done {
-  border-color: #a8ddc0;
-  background: #f4fbf6;
+  color: #116e3a;
 }
 
-.wizard-progress-step.is-done span {
+.wizard-progress-step.is-done .wizard-progress-dot {
   border-color: #6bb887;
+  background: #f4fbf6;
   color: #116e3a;
+}
+
+.wizard-progress-step.is-done::after {
+  background: #8fcea7;
 }
 
 .wizard-grid {
@@ -846,7 +878,13 @@ h1, h2, h3, h4, h5, h6, .logo {
   }
 
   .wizard-progress {
-    grid-template-columns: 1fr 1fr;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .wizard-progress-step::after {
+    display: none;
   }
 
   .wizard-grid-2 {

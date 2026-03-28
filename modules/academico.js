@@ -303,6 +303,15 @@ export const Academico = {
     return `/${clean}`;
   },
 
+  _withTimeout(promise, timeoutMs = 12000, message = "La carga de rutas tardo demasiado.") {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  },
+
   async _collectSiteRoutes(path = "", depth = 0, maxDepth = 4) {
     if (depth > maxDepth) return [];
     const entries = await GitHubAPI.getDirectory(REPOS.site, path);
@@ -311,8 +320,13 @@ export const Academico = {
     const routes = [];
 
     for (const entry of entries) {
+      if (!path) {
+        if (entry.type === "dir" && entry.name !== "academico") continue;
+        if (entry.type === "file" && !/\.html?$/i.test(entry.name || "")) continue;
+      }
+
       if (entry.type === "dir") {
-        if (this._shouldIgnoreSitePath(entry.path, true)) continue;
+        if (this._shouldIgnoreSitePath(entry.path)) continue;
         const nested = await this._collectSiteRoutes(entry.path, depth + 1, maxDepth);
         routes.push(...nested);
         continue;
@@ -342,10 +356,17 @@ export const Academico = {
     this.renderCurrentView();
 
     try {
-      const allRoutes = await this._collectSiteRoutes("", 0, 4);
+      const allRoutes = await this._withTimeout(
+        this._collectSiteRoutes("", 0, 6),
+        12000,
+        "No pudimos terminar de cargar rutas a tiempo. Proba nuevamente."
+      );
       const uniqueRoutes = [...new Set(allRoutes)].sort((a, b) => a.localeCompare(b));
       this.siteRoutesCache = uniqueRoutes;
       this.wizard.linkPathOptions = [...uniqueRoutes];
+      if (uniqueRoutes.length === 0) {
+        this.wizard.linkPathError = "No encontramos rutas internas disponibles para seleccionar.";
+      }
     } catch (error) {
       this.wizard.linkPathError = `No se pudieron cargar rutas internas: ${error.message}`;
     } finally {
@@ -956,13 +977,14 @@ export const Academico = {
   },
   _renderWizardProgress() {
     return `
+      <div class="wizard-progress-meta">Paso ${this.wizard.step} de ${WIZARD_STEPS.length}</div>
       <div class="wizard-progress">
         ${WIZARD_STEPS.map((step) => {
           const current = this.wizard.step === step.id;
           const done = this.wizard.step > step.id;
           return `
             <div class="wizard-progress-step ${current ? "is-current" : ""} ${done ? "is-done" : ""}">
-              <span>${step.id}</span>
+              <span class="wizard-progress-dot">${done ? "✓" : step.id}</span>
               <small>${step.label}</small>
             </div>
           `;
@@ -1072,6 +1094,8 @@ export const Academico = {
             <button type="button" id="wizard-load-routes" class="btn btn-sm btn-outline" ${this.wizard.linkPathLoading ? "disabled" : ""}>${loadButtonLabel}</button>
           </div>
           <p class="text-muted" style="font-size:0.82rem; margin:0.45rem 0 0;">Carga rutas publicas del sitio para elegir sin escribirlas manualmente.</p>
+          ${this.wizard.linkPathLoading ? '<p class="text-muted" style="font-size:0.8rem; margin-top:0.45rem;">Buscando rutas en /academico...</p>' : ""}
+          ${hasRoutes ? `<p class="text-muted" style="font-size:0.8rem; margin-top:0.45rem;">${this.wizard.linkPathOptions.length} ruta(s) encontradas.</p>` : ""}
           ${this.wizard.linkPathError ? `<div class="wizard-error" style="min-height:0; margin-top:0.45rem;">${escapeHtml(this.wizard.linkPathError)}</div>` : ""}
           ${hasRoutes ? `
             <div class="form-group" style="margin-top:0.7rem; margin-bottom:0;">
@@ -1236,7 +1260,7 @@ export const Academico = {
     container.querySelector("#wizard-back-list")?.addEventListener("click", () => this._attemptWizardExit());
     container.querySelector("#wizard-cancel")?.addEventListener("click", () => this._attemptWizardExit());
     container.querySelector("#wizard-discard-draft")?.addEventListener("click", () => this._discardWizardDraft());
-    container.querySelector("#wizard-load-routes")?.addEventListener("click", () => this._loadSiteRouteOptions({ force: true }));
+    container.querySelector("#wizard-load-routes")?.addEventListener("click", () => this._loadSiteRouteOptions());
     container.querySelector("#wizard-internal-route")?.addEventListener("change", (event) => {
       const route = event.target.value || "";
       this.wizard.data.url = route;
